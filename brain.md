@@ -36,7 +36,7 @@ A consumer hazard-audit agent. You list what you own (+ non-medical context); it
 ## 4. Tech stack (as scaffolded)
 - **Frontend:** Next.js 15.5.19 (App Router) · React 19 · TypeScript · Tailwind 4 (`@tailwindcss/postcss`).
 - **3D:** three.js 0.177.0 · @react-three/fiber 9.6.1 · @react-three/drei 10.7.7.
-- **Harness:** self-hosted Python + Anthropic Agent SDK (not yet scaffolded — waiting on finalized schema + source recon).
+- **Harness:** self-hosted Python + Anthropic Agent SDK (not yet scaffolded — schema + `SOURCES.md` now ready; blocked only on the Anthropic + Supabase keys).
 - **Data:** Supabase Postgres.
 - **Host:** Vercel (Fluid Compute; supports Python natively — relevant for the runtime agent). Remote: `github.com/aetherino/Warden`.
 
@@ -49,31 +49,35 @@ components/
 rubric.md                 the spec / gates ("done" definition)
 ISSUES.md                 tasks, state, decisions log
 brain.md                  this file
+SOURCES.md                verified data-source reference (endpoints, auth, ZIP→PWSID, citation strategy)
+.claude/skills/           frontend-design skill (installed, for UI work)
 fixtures/                 (pending) example payload/dossier + golden_dev/golden_holdout
-SOURCES.md                (pending) data-source reference from recon workflow
 harness/                  (pending) Python Agent SDK build-time crawler
 ```
 
 ## 6. Assumptions (revisit if any breaks)
-- **Core sources are keyless & public:** CPSC, EPA (SDWIS/ECHO/UCMR), CA Prop 65 — being verified by the recon workflow. Only the confidence layer (Exa) + LLM (Anthropic) + Supabase need keys.
-- **CPSC is the money-shot ACT source** — cleanest API, most visceral demo ("your heater was recalled").
-- **Item matching is feasible via keyword/model query** against CPSC (to be confirmed by recon).
-- **ZIP→PWSID is the riskiest join** (user ZIP → their water system) — flagged as the nastiest integration; recon is scoping it.
+- **Core sources keyless & public — VERIFIED LIVE (recon):** CPSC (saferproducts.gov REST), EPA ECHO/SDWA, openFDA, USDA-FSIS. Keys only for: Exa + OpenAlex (now needs a free key as of Feb 2026) + Semantic Scholar (⚠️ rejects gmail) [§7], and infra Anthropic + Supabase + Vercel.
+- **CPSC is the money-shot ACT source** — verified no-auth REST; query Manufacturer+Importer+Distributor + ProductName/Title/Description, merge by `RecallID` (model#/UPC mostly empty → brand+noun keyword + Description confirm).
+- **ZIP→PWSID approach FOUND (recon):** no direct API → Census/HUD ZIP→county crosswalk → ECHO `get_systems` by county; `UCMR5_ZIPCodes.txt` direct for PFAS. PWSID is the cross-source join key. (Still the trickiest integration; build the cached table at setup.)
+- **Per-violation EPA findings need bulk-CSV ingestion** (REST gives only counts) → a quarterly bulk-refresh job distinct from the live path.
 - **Golden set is AI-labeled but leakage-proof:** ground-truth ACT cases, separate labeler agent, dev/holdout split.
 
 ## 7. Open considerations / watch-list
 - **Schema landed:** per-finding now has `origin ∈ {user_listed,curated_pathway,ai_inferred}` + a `discovery` block (pathway + grounding receipt); plus a `record_statement` object and `discovery_rejected.json`. Harness data model can be built against this.
-- **Open-inference tunables must be CALIBRATED, not asserted** (see ISSUES #012): the Tier-1/2 domain allowlist, agent-matching at registry-id level (or it over-rejects PFAS), N=8/M=3 caps, the linkage co-occurrence window + transport-verb list, and negative-control re-validation each release. These are the soft spots where the rigor can silently break.
+- **Open-inference tunables must be CALIBRATED, not asserted** (see ISSUES #012): the Tier-1/2 domain allowlist (now extended to CPSC/FDA/FSIS/oag.ca.gov regulators), agent-matching at registry-id level (or it over-rejects PFAS), N=8/M=3 caps, the linkage co-occurrence window + transport-verb list, and negative-control re-validation each release. These are the soft spots where the rigor can silently break.
+- **Recon gotchas (SOURCES.md):** CPSC defaults to XML (`format=json` required); EPA `get_download` errors on JSON (CSV only) and the PWSID param is `p_pid`; OEHHA Prop 65 list sits behind an Incapsula bot-wall (browser/Playwright fallback); `source.locator` must hold COMPOSITE keys for EPA-violation/UCMR; FRS `get_facilities` + FSIS schema are UNVERIFIED (re-verify before relying).
+- **Absence-is-not-safety at the data layer:** UCMR reports only ≥MRL (null = non-detect, not missing); small systems unsampled; openFDA/SDWIS lag reality. Capture as-of/dataset-version on every finding; render absence as a neutral timestamped record statement.
 - **three.js perf on a projector/judge laptop** — cap it, test on non-dev hardware, keep a static fallback.
 - **Live-crawl rate limits** during the demo — caching layer + seeded basket are the insurance.
 - **Blank-screen demo failure** — judge types items with no recall → must show the neutral record statement, never silence. (§9)
 
 ## 8. Conventions
 - **Delegation:** simple/mechanical coding → Sonnet subagents; heavy design/logic → Opus. Substantive tasks → Workflow orchestration (ultracode on).
-- **Git as evidence:** checkpoint commits per milestone; git history + commit messages double as the §8 Autonomy "build→verify→fix loop" trail. Baseline on `master`; push to `origin`.
+- **Git as evidence:** checkpoint commits per milestone; git history doubles as the §8 Autonomy "build→verify→fix loop" trail. **Direct-master commits enabled** (`Bash(git push:*)` permission) — commit + push straight to `master`, no PRs (the earlier branch/PR flow caused diverging-tracker friction).
 - **Keys on demand:** surface each external key request exactly when a step blocks (user preference), not upfront.
 - **This doc + ISSUES.md evolve every milestone.**
 
 ## 9. Evolution log
 - **2026-06-13** — Foundation: rubric v2 (+§11 contextual discovery), Next.js+three.js shield scaffold, ISSUES.md tracker, memory seeded. Two workflows in flight: open-inference §11 design + source recon. brain.md created. Baseline committed.
 - **2026-06-13** — Open-inference §11 design (8-agent adversarial workflow) applied to rubric: schema `origin`+`discovery`, extended Gate 12, search-grounded default-reject judge (domain allowlist, string-linkage, anti-equivocation), `discovery_rejected.json`, surface cap, §10 pathway legibility, origin-blind shield. Source-recon workflow still running.
+- **2026-06-13** — Source recon (7-agent) → SOURCES.md; §11 allowlist extended to all regulators; PRs #1–#3 merged to master; direct-master commits enabled; frontend-design skill installed. Trackers flushed.
