@@ -33,9 +33,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Warden — The Public Record, Audited",
+  title: "Warden — Stand guard over your health",
   description:
-    "Consumer hazard-audit agent. Warden reports the state of the public record about the things you own — ranked, conditioned, cited. Never a safe/unsafe verdict.",
+    "Warden keeps watch over the recalls, water violations, and warnings on the things you own — ranked, cited, and exactly what to do. You stand guard; Warden does the watching.",
 };
 
 export default function RootLayout({
