@@ -1,0 +1,138 @@
+{
+  "_meta": {
+    "purpose": "Warden golden set — HOLDOUT split (rubric §4). VERIFIER-ONLY: never seen during builder tuning, to defeat train-on-test leakage. GATE 3 EVALUATES THIS SPLIT: tier-match ≥90%; HARD rule — any active recall / qualifying settlement → ACT; ONE downward mis-tier on an ACT case = fail. Labels are produced by a fresh-context labeler independent of the runtime tiering logic; ACT cases self-label from real CPSC recalls pulled live from saferproducts.gov on 2026-06-13.",
+    "labeler": "fresh-context golden-set harness (HTTP-decoupled from warden/*.py)",
+    "split": "holdout (~40%); dev split in golden_dev.json (~60%)"
+  },
+  "cases": [
+    {
+      "id": "act-space-heater-holdout",
+      "item": "portable space heater",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall of Vornado portable SRTH tower heaters — miswiring can cause overheating / fire hazard. An active recall on an owned item is ACT by definition (§4 hard rule).",
+      "source_hint": "CPSC RecallNumber 23148"
+    },
+    {
+      "id": "act-baby-inclined-sleeper-holdout",
+      "item": "baby inclined sleeper",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Recent CPSC recall (2025-2026) of Vevor baby swings used for sleep — suffocation hazard; violates the mandatory infant-sleep / inclined-sleeper ban. Active recall → ACT.",
+      "source_hint": "CPSC RecallNumber 26074"
+    },
+    {
+      "id": "act-baby-stroller-holdout",
+      "item": "baby stroller",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Recent CPSC recall (2025) of AliExpress convertible strollers — risk of serious injury or death from a fall hazard; violates the mandatory stroller standard. Active recall → ACT.",
+      "source_hint": "CPSC RecallNumber 26094"
+    },
+    {
+      "id": "act-electric-bike-holdout",
+      "item": "electric bike",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall (2025) of FENGQS electric bikes — lithium-ion fire/burn hazards; risk of serious injury or death. Active recall on an owned item → ACT.",
+      "source_hint": "CPSC RecallNumber 25403"
+    },
+    {
+      "id": "act-rocknplay-holdout",
+      "item": "Rock 'n Play infant sleeper",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall of Fisher-Price Rock 'n Play Sleepers (reannounced 2023; at least eight infant deaths). Active recall on an owned item → ACT. Distinct phrasing from the dev case to test generalization, not memorization.",
+      "source_hint": "CPSC RecallNumber 23088"
+    },
+    {
+      "id": "act-peloton-holdout",
+      "item": "Peloton Tread+ treadmill",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall after one child died and 70+ incidents (objects/children pulled under the rear). Active recall → ACT.",
+      "source_hint": "CPSC RecallNumber 21128"
+    },
+    {
+      "id": "decoy-garland-holdout",
+      "item": "artificial christmas garland",
+      "context": {},
+      "expected_tier": "CONTEXT",
+      "rationale": "Should-not-alarm decoy (§5). No matching active recall for plain artificial garland; its only public-record hits are ubiquitous Prop 65 60-day notices (lead/phthalates in decorative PVC) → is_ubiquitous, suppressed to CONTEXT. Must not over-alarm.",
+      "source_hint": "Prop65 ubiquitous (CA OAG 60-day notices)"
+    },
+    {
+      "id": "decoy-shower-curtain-holdout",
+      "item": "vinyl shower curtain liner",
+      "context": {},
+      "expected_tier": "CONTEXT",
+      "rationale": "Should-not-alarm decoy (§5). No active recall matches; only ubiquitous Prop 65 PVC/phthalate notices → CONTEXT (suppressed noise).",
+      "source_hint": "Prop65 ubiquitous (CA OAG 60-day notices)"
+    },
+    {
+      "id": "decoy-ceramic-plates-holdout",
+      "item": "ceramic dinner plate set",
+      "context": {},
+      "expected_tier": "AWARE",
+      "rationale": "Should-not-alarm decoy (§5) at the baseline edge. Lead-glaze on ceramic dinnerware is a real, widely-known regional/baseline concern (Prop 65 territory). It must land AWARE or CONTEXT — a real but baseline/low-action concern — never an ACT/ADDRESS alarm. Accept AWARE or CONTEXT (both are 'should-not-alarm').",
+      "source_hint": "regional baseline / Prop65 lead-glaze (≤ AWARE)",
+      "accept_tiers": ["AWARE", "CONTEXT"]
+    },
+    {
+      "id": "decoy-vinyl-floor-mat-holdout",
+      "item": "vinyl floor mat",
+      "context": {},
+      "expected_tier": "CONTEXT",
+      "rationale": "Should-not-alarm decoy (§5). Real ubiquitous Prop 65 60-day notices exist for vinyl floor mats (PVC/DEHP), but no relevant active recall — so the keyword CPSC hits drop and only the ubiquitous Prop 65 noise remains → suppressed to CONTEXT. Must not over-alarm on a sticker that is on everything.",
+      "source_hint": "Prop65 ubiquitous (CA OAG 60-day notices: AG 2017-00489, 2013-01063)"
+    },
+    {
+      "id": "clean-novel-item-holdout",
+      "item": "zblorptx frobnik kwxz",
+      "context": {},
+      "expected_tier": "NONE",
+      "rationale": "Clearly-clean / novel item — a nonsense string with no real product-noun tokens, so no CPSC recall, no Prop 65 notice, no public action on file. Expect a neutral timestamped record statement (NONE), never a blank screen and never an all-clear (§9). (Note: a 'clean'-sounding item that contains a common noun like 'blanket' will trip real keyword hits — the clean control must be token-clean.)",
+      "source_hint": "no public record on file → record_statement"
+    },
+    {
+      "id": "cond-water-flint-with-tap-holdout",
+      "item": "tap-water-system-flint-holdout",
+      "context": {"zip": "48503", "water_source": "tap"},
+      "expected_tier": "ADDRESS",
+      "rationale": "§6 conditioning (higher-exposure context). ZIP 48503 → FLINT, CITY OF (PWSID MI0002310), SDWA violations on EPA ECHO. With the drinks-unfiltered-tap exposure context this surfaces as ADDRESS with a non-null condition.",
+      "source_hint": "EPA ECHO SDWA — PWSID MI0002310",
+      "conditioning_pair": "water-flint-holdout",
+      "exposure": "high"
+    },
+    {
+      "id": "cond-water-flint-no-context-holdout",
+      "item": "tap-water-system-flint-holdout",
+      "context": {},
+      "expected_tier": "NONE",
+      "rationale": "§6 conditioning (lower-exposure context). With NO ZIP / water context the water hazard is not investigated at all (ZIP-driven source) and is not surfaced. Direction: the higher-exposure context (ADDRESS) must never tier LOWER than this one.",
+      "source_hint": "no zip context → water hazard not surfaced",
+      "conditioning_pair": "water-flint-holdout",
+      "exposure": "low"
+    },
+    {
+      "id": "cond-infant-rocknplay-with-infant-holdout",
+      "item": "Fisher-Price Rock 'n Play Sleeper",
+      "context": {"children": "infant"},
+      "expected_tier": "ACT",
+      "rationale": "§6 conditioning (higher-exposure context). An infant in the home is the at-risk receptor for an infant-sleeper recall. Active recall → ACT regardless; the at-risk context must NEVER lower the tier relative to the no-context case.",
+      "source_hint": "CPSC RecallNumber 23088",
+      "conditioning_pair": "infant-rocknplay-holdout",
+      "exposure": "high"
+    },
+    {
+      "id": "cond-infant-rocknplay-no-context-holdout",
+      "item": "Fisher-Price Rock 'n Play Sleeper",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "§6 conditioning (lower-exposure context / baseline). Same hazard, no infant context. Active recall → ACT. Direction: the infant-context case must never tier LOWER than this baseline.",
+      "source_hint": "CPSC RecallNumber 23088",
+      "conditioning_pair": "infant-rocknplay-holdout",
+      "exposure": "low"
+    }
+  ]
+}

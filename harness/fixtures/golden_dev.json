@@ -1,0 +1,124 @@
+{
+  "_meta": {
+    "purpose": "Warden golden set — DEV split (rubric §4/§5/§6). The BUILDER tunes against this split; the verifier-only HOLDOUT split lives in golden_holdout.json and Gate 3 runs there. Labels here are produced by a fresh-context labeler (this harness author), independent of the runtime tiering logic: ACT cases self-label from real CPSC recalls (an active recall IS ACT by definition), decoys self-label from the ubiquity of Prop 65 / regional baselines, conditioning pairs assert a DIRECTION not an absolute tier.",
+    "labeler": "fresh-context golden-set harness (HTTP-decoupled from warden/*.py)",
+    "tier_semantics": {
+      "ACT": "active recall on an owned item / claimable settlement — stop use / refund / claim",
+      "ADDRESS": "real, conditional, remediable — always states a triggering condition",
+      "AWARE": "real but baseline / low-action (regional radon, NOA, lead-glaze baseline)",
+      "CONTEXT": "ubiquitous non-specific noise (generic Prop 65 notices) — suppressed by default",
+      "NONE": "no active recall or public action on file — neutral timestamped record statement"
+    },
+    "grounding_note": "Every ACT source_hint is a REAL CPSC RecallNumber pulled live from saferproducts.gov on 2026-06-13. Decoys anchor on the ubiquity of CA Prop 65 60-day notices."
+  },
+  "cases": [
+    {
+      "id": "act-rocknplay-dev",
+      "item": "Fisher-Price Rock 'n Play Sleeper",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall of 4.7M inclined infant sleepers (reannounced 2023; at least eight infant deaths). An active recall on an owned item is ACT by definition (§4 hard rule).",
+      "source_hint": "CPSC RecallNumber 23088"
+    },
+    {
+      "id": "act-peloton-treadplus-dev",
+      "item": "Peloton Tread+ treadmill",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall after one child died and 70+ incidents — users/children/pets/objects can be pulled under the rear of the treadmill. Active recall on an owned item → ACT.",
+      "source_hint": "CPSC RecallNumber 21128"
+    },
+    {
+      "id": "act-power-bank-dev",
+      "item": "lithium-ion power bank",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Recent CPSC recall (2026) of VEEKTOMX mini power banks — lithium-ion battery can overheat and ignite (fire/burn hazard). Active recall → ACT.",
+      "source_hint": "CPSC RecallNumber 26399"
+    },
+    {
+      "id": "act-dehumidifier-dev",
+      "item": "dehumidifier",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall of 1.56M Gree dehumidifiers (fire/burn hazards; at least 23 fires). Active recall on an owned item → ACT.",
+      "source_hint": "CPSC RecallNumber 23262"
+    },
+    {
+      "id": "act-pressure-cooker-dev",
+      "item": "pressure cooker",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall of 1.8M SharkNinja Foodi multi-function pressure cookers (burn hazard; serious burn injuries). Active recall → ACT.",
+      "source_hint": "CPSC RecallNumber 25247"
+    },
+    {
+      "id": "act-magnetic-balls-dev",
+      "item": "magnetic balls toy",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Recent CPSC recall (2026) of magnetic ball sets — risk of serious injury or death from magnet ingestion; violates the mandatory toy standard. Active recall → ACT.",
+      "source_hint": "CPSC RecallNumber 26509"
+    },
+    {
+      "id": "act-window-shades-dev",
+      "item": "corded window roller shades",
+      "context": {},
+      "expected_tier": "ACT",
+      "rationale": "Active CPSC recall (2025) of Homebox blackout roller shades — strangulation/entanglement hazard; violates the federal window-covering rule. Active recall → ACT.",
+      "source_hint": "CPSC RecallNumber 25147"
+    },
+    {
+      "id": "decoy-shower-curtain-dev",
+      "item": "vinyl shower curtain",
+      "context": {},
+      "expected_tier": "CONTEXT",
+      "rationale": "A should-not-alarm decoy (§5). No active recall matches a vinyl shower curtain; its only public-record hits are ubiquitous Prop 65 60-day notices (PVC/phthalates blanket nearly everything in CA) → is_ubiquitous, suppressed to CONTEXT.",
+      "source_hint": "Prop65 ubiquitous (CA OAG 60-day notices)"
+    },
+    {
+      "id": "decoy-tablecloth-dev",
+      "item": "vinyl tablecloth",
+      "context": {},
+      "expected_tier": "CONTEXT",
+      "rationale": "Should-not-alarm decoy (§5). No matching active recall; hits are ubiquitous Prop 65 PVC/DEHP notices → CONTEXT (suppressed noise). Must not over-alarm on a sticker that is on everything.",
+      "source_hint": "Prop65 ubiquitous (CA OAG 60-day notices)"
+    },
+    {
+      "id": "decoy-faux-leather-wallet-dev",
+      "item": "faux leather wallet",
+      "context": {},
+      "expected_tier": "CONTEXT",
+      "rationale": "Should-not-alarm decoy (§5). No matching active recall; only ubiquitous Prop 65 notices on synthetic-leather goods → CONTEXT.",
+      "source_hint": "Prop65 ubiquitous (CA OAG 60-day notices)"
+    },
+    {
+      "id": "clean-novel-item-dev",
+      "item": "handmade oak cutting board zzkx",
+      "context": {},
+      "expected_tier": "NONE",
+      "rationale": "Clearly-clean / novel item — no recall, no Prop 65 notice, no public action on file. Expect a neutral timestamped record statement (NONE), never a blank screen and never an all-clear (§9).",
+      "source_hint": "no public record on file → record_statement"
+    },
+    {
+      "id": "cond-water-flint-with-tap-dev",
+      "item": "tap-water-system-flint-dev",
+      "context": {"zip": "48503", "water_source": "tap"},
+      "expected_tier": "ADDRESS",
+      "rationale": "§6 conditioning (higher-exposure context). ZIP 48503 resolves to FLINT, CITY OF (PWSID MI0002310), which has SDWA violations on EPA's ECHO record. With the exposure context present (drinks unfiltered tap water) this surfaces as ADDRESS with a non-null condition.",
+      "source_hint": "EPA ECHO SDWA — PWSID MI0002310",
+      "conditioning_pair": "water-flint",
+      "exposure": "high"
+    },
+    {
+      "id": "cond-water-flint-no-context-dev",
+      "item": "tap-water-system-flint-dev",
+      "context": {},
+      "expected_tier": "NONE",
+      "rationale": "§6 conditioning (lower-exposure context). With NO ZIP / water context, the water hazard is not investigated at all (ZIP-driven source) and is therefore not surfaced. Direction: the higher-exposure context (ADDRESS) must never tier LOWER than this one.",
+      "source_hint": "no zip context → water hazard not surfaced",
+      "conditioning_pair": "water-flint",
+      "exposure": "low"
+    }
+  ]
+}
