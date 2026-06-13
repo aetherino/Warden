@@ -156,6 +156,21 @@ export const PROXIMITY_OPTIONS = [
   "recent renovation",
 ] as const;
 
+// Each "Anything nearby?" chip maps to the boolean context flag the §11 discovery
+// engine actually triggers on (harness/warden/discovery.py `_has_discovery_context`
+// + the curated pathways' `triggers`). Selecting a chip MUST set its flag — the
+// curated fast-path pathways (airport/base → AFFF/PFAS → water; pre-1978 → lead;
+// farmland → nitrate) key on these, NOT on the free-text list. "recent renovation"
+// has no brain flag yet (#049) so it rides along only as a free-text proximity span.
+export const PROXIMITY_FLAG: Record<string, string> = {
+  "near an airport": "near_airport",
+  "military base": "near_military_base",
+  "farmland": "near_farmland",
+  "industrial site": "near_industrial",
+  "older home (pre-1978)": "old_home",
+  "well water": "well_water",
+};
+
 // The seeded demo basket (the safe demo path, rubric §E).
 export const DEMO_BASKET = [
   "Fisher-Price Rock 'n Play Sleeper",
@@ -178,6 +193,17 @@ export function buildContext(opts: {
   if (z.length === 5) ctx.zip = z;
   if (opts.region?.trim()) ctx.region = opts.region.trim();
   if (opts.tapWater) ctx.water_source = "tap";
-  if (opts.proximity && opts.proximity.length) ctx.proximity = opts.proximity;
+  if (opts.proximity && opts.proximity.length) {
+    // Keep the verbatim spans (free text + "recent renovation") so INFER has the
+    // trigger_signal text…
+    ctx.proximity = opts.proximity;
+    // …AND set the boolean flags the curated §11 fast-path triggers on. Without
+    // this the new "Anything nearby?" chips were inert (discovery only half-fired
+    // off ZIP; the AFFF→PFAS flagship never triggered).
+    for (const p of opts.proximity) {
+      const flag = PROXIMITY_FLAG[p.trim().toLowerCase()];
+      if (flag) ctx[flag] = true;
+    }
+  }
   return ctx;
 }

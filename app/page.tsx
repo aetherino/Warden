@@ -400,7 +400,7 @@ export default function Home() {
             Warden
           </span>
           <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-faint)] sm:tracking-[0.28em]">
-            know what&rsquo;s around you
+            guard your wellbeing
           </span>
         </div>
         <div className="flex items-center gap-5">
@@ -420,7 +420,7 @@ export default function Home() {
           {/* Hero (WELCOME register, golden circle) — on a solid panel. */}
           <section className="reveal-fade solid-panel mb-5 px-5 py-7 sm:px-7">
             <h1 className="font-display text-[clamp(26px,7vw,38px)] font-semibold leading-[1.05] tracking-tight text-[var(--ink)]">
-              Know what&rsquo;s around you.
+              Guard your wellbeing.
             </h1>
             <p className="mt-3 max-w-prose text-[15px] leading-[1.6] text-[var(--ink-soft)] sm:text-[16px]">
               The things you own and the place you live can carry recalls, warnings, and

@@ -16,7 +16,7 @@ export default function Page() {
     <main className="relative flex min-h-screen w-full items-center justify-center bg-[var(--paper)] px-6 py-16">
       <div className="relative z-10 w-full max-w-md">
         <p className="mb-3 text-center font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-faint)]">
-          Warden · know what&rsquo;s around you
+          Warden · guard your wellbeing
         </p>
         {authEnabled ? (
           <div className="flex justify-center">
