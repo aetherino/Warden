@@ -1,12 +1,11 @@
 # Warden — Open Issues & Project State
 
-## Status: v1 RUNNING + expanding. 4 parallel agents in flight: white particle-field reskin (worktree, runs frontend-design skill, + UX/error fixes), CA Prop 65 client (→CONTEXT), EPA water-by-ZIP client (→ADDRESS), triage hardening (compliance/§3/injection gates). Main-loop is orchestrating, not hand-coding.
+## Status: v1+ — reskin MERGED, backend ACT/ADDRESS/CONTEXT live, §12 live agentic scan SHIPPED + verified. In flight: Clerk auth prep (flag-gated). Ready: UX rework spec (design/UX_REWORK.md). Main-loop orchestrating.
 
 ## In flight
-- Tester (main tree, new harness/tests/ + e2e/): building + running e2e suite (pytest API + Playwright UI) — RUNNING.
-- Reskin (worktree 61485df): white particle-field DONE — blob fixed (point-size attenuation was ~50× too big), archival type (Fraunces/Newsreader/IBM Plex Mono), tier-reactive field (calm slate→ACT red breach), mono receipt citations, error boundary, validated fetch; build/tsc/eslint clean. MERGE pending tester finish (merging now would HMR-reload :3000 mid-test).
-- Backend ACT+ADDRESS+CONTEXT from real sources + compliance/§3/injection gates — committed (e6d67bc).
-- QUEUED (gated on tester+merge): §12 live agentic scan — backend SSE step-stream + frontend live scan-log; + add the ZIP/water-source intake input (#036) so EPA findings surface from the UI.
+- Clerk auth prep (agent): flag-gated `@clerk/nextjs` scaffold — INERT without keys (demo stays login-free), activates only when Clerk keys present (`vercel integration add clerk` or .env). RUNNING.
+- UX designer — DONE → `design/UX_REWORK.md` (4-act rework: Enroll→Scan→Dossier→Initiatives; golden-circle two-register copy; boxed legibility). UX CODER queued for the later rework (#040), gated behind Clerk prep.
+- Shipped to master: reskin (f477e26) · §12 live scan + ZIP intake (4669bdb) · backend e2e suite, 8 pass (bfcaef5) · backend expansion Prop65/EPA/compliance (e6d67bc).
 
 ## Big Picture
 Consumer hazard-audit agent. Lists what you own → grinds public regulatory/litigation/
