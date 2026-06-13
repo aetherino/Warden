@@ -202,18 +202,30 @@ async function run() {
   try {
     console.log(`[1] load ${UI} (idle)`);
     await page.goto(UI, { waitUntil: "networkidle" });
-    await page.getByText(/Stand guard/i).first().waitFor({ timeout: 20_000 });
+    // The rework opens on the WELCOME hero + the 3-question EnrollFlow (Act 1).
+    await page.getByText(/Know what.s around you/i).first().waitFor({ timeout: 20_000 });
+    await page.getByTestId("enroll-flow").waitFor({ state: "visible", timeout: 20_000 });
     await page.screenshot({ path: `${SHOTS}/00_idle.png`, fullPage: true });
 
-    console.log("[2] use demo basket (ZIP prefilled) + run audit");
-    await page.getByRole("button", { name: /Use demo basket/i }).click();
-    // React state settles a tick after the click — wait for the ZIP to populate.
+    console.log("[2] advance to Q3, use demo basket (ZIP prefilled) + run audit");
+    // Q1 -> Q2 -> Q3 via the sticky Next action; the demo basket lives on Q3.
+    await page.getByRole("button", { name: /^Next →$/ }).click();
+    await page.getByText("Anything nearby?", { exact: false }).first().waitFor({ timeout: 8000 });
+    await page.getByRole("button", { name: /^Next →$/ }).click();
+    await page.getByText("What do you own?", { exact: false }).first().waitFor({ timeout: 8000 });
+    await page.getByRole("button", { name: /Use demo basket/i }).first().click();
+    // The demo fills the basket + the ZIP (48503); item pills materialize from the parse.
     await page.waitForFunction(
-      () => document.querySelector('input[aria-label="ZIP code"]')?.value === "48503",
+      () => document.querySelectorAll(".item-pill").length >= 3,
       { timeout: 8000 }
     );
-    assert((await page.getByLabel("ZIP code").inputValue()) === "48503", "demo prefilled ZIP 48503");
-    await page.getByRole("button", { name: /Run audit/i }).click();
+    // Advance to the confirm slip; it echoes the demo-prefilled ZIP as text (the input
+    // lives on Q1, the slip is the confirmed-back view — a stronger e2e check).
+    await page.getByRole("button", { name: /^Next →$/ }).click();
+    const slip = page.getByTestId("request-slip");
+    await slip.waitFor({ timeout: 8000 });
+    assert(/ZIP 48503/i.test(await slip.innerText()), "demo prefilled ZIP 48503 (echoed on the request slip)");
+    await page.getByTestId("run-audit").click();
 
     // (1) The live scan shows during the run, inside a SOLID panel.
     const scanHero = page.getByTestId("scan-hero");
@@ -246,6 +258,14 @@ async function run() {
     // (6) The weak generic headline is replaced — no h3 titled exactly "Recalled by CPSC".
     const weak = await page.getByRole("heading", { name: "Recalled by CPSC", exact: true }).count();
     assert(weak === 0, 'weak "Recalled by CPSC" headline is replaced (derived hazard instead)');
+
+    // The dossier groups by item as a collapsible accordion (MOBILE_UX §5.2): ACT/ADDRESS
+    // groups start expanded, AWARE+ collapsed. Expand every collapsed group so all cards
+    // (incl. the suppressed-tier Prop 65 card) are in the DOM for the assertions below.
+    const heads = page.locator(".accordion-head[aria-expanded='false']");
+    for (let i = (await heads.count()) - 1; i >= 0; i--) {
+      await heads.nth(i).click();
+    }
 
     await page.screenshot({ path: `${SHOTS}/02_grouped_dossier.png`, fullPage: true });
 

@@ -127,8 +127,8 @@ export default function ScanLog({
   // ── Collapsed (post-run) — inviting, not a buried "log". ─────────────────────
   if (collapsible) {
     return (
-      <details className="reveal rounded-[3px] border bg-white/70 px-5 py-3.5 hairline-soft">
-        <summary className="inline-flex cursor-pointer items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--ink-soft)] transition-colors hover:text-[var(--ink)]">
+      <details className="reveal rounded-[3px] solid-panel-soft px-5 py-3.5">
+        <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--ink-soft)] transition-colors hover:text-[var(--ink)]">
           <span aria-hidden className="disclosure-caret text-[var(--ink-faint)]">
             ›
           </span>
@@ -145,13 +145,13 @@ export default function ScanLog({
 
   return (
     <section
-      className="reveal rounded-[3px] border bg-white/95 px-5 py-5 shadow-[0_18px_44px_-30px_rgba(28,27,24,0.4)] hairline sm:px-6 sm:py-6"
+      className="reveal solid-panel px-5 py-5 sm:px-6 sm:py-6"
       data-testid="scan-hero"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {running && <span className="warden-pulse-dot" aria-hidden />}
-          <p className="font-display text-[19px] font-medium leading-none text-[var(--ink)]">
+          <p className="font-mono text-[12px] font-medium uppercase tracking-[0.2em] leading-none text-[var(--ink)]">
             {running ? (
               <>
                 Checking
@@ -163,12 +163,12 @@ export default function ScanLog({
           </p>
         </div>
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-faint)]">
-          live · the agentic record
+          live
         </p>
       </div>
 
       <p className="mt-2 max-w-prose font-mono text-[11px] leading-[1.55] text-[var(--ink-faint)]">
-        Watching Warden work the stacks — one real step per source, as it lands.
+        One real step per source, as it lands.
       </p>
 
       {rows}

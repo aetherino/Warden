@@ -44,17 +44,29 @@ async function run() {
   try {
     console.log(`[1] load ${UI}`);
     await page.goto(UI, { waitUntil: "networkidle" });
-    assert(await page.getByText("What do you", { exact: false }).first().isVisible(),
-      "intake heading visible");
+    // The rework opens on the hero + the 3-question EnrollFlow (Act 1).
+    await page.getByTestId("enroll-flow").waitFor({ state: "visible", timeout: 15_000 });
+    assert(await page.getByText("Where do you live?", { exact: false }).first().isVisible(),
+      "enrollment Q1 (Where do you live?) visible");
 
-    console.log("[2] enter a demo item + ZIP 48503 + tap-water toggle (#036)");
-    await page.locator("textarea").fill("portable space heater");
+    console.log("[2] Q1: ZIP 48503 + unfiltered-tap toggle (#036), advance to Q3");
     await page.getByLabel("ZIP code").fill("48503");
     await page.getByText("I drink unfiltered tap water").click();
     assert((await page.getByLabel("ZIP code").inputValue()) === "48503", "ZIP field holds 48503");
+    // Q1 -> Q2 -> Q3 via the sticky Next action.
+    await page.getByRole("button", { name: /^Next →$/ }).click();
+    await page.getByText("Anything nearby?", { exact: false }).first().waitFor({ timeout: 8000 });
+    await page.getByRole("button", { name: /^Next →$/ }).click();
+    await page.getByText("What do you own?", { exact: false }).first().waitFor({ timeout: 8000 });
+
+    console.log("[2b] enter a demo item via the stream-of-thought textarea");
+    await page.locator("textarea").fill("portable space heater");
+    // Q3 -> confirm slip, then RUN AUDIT.
+    await page.getByRole("button", { name: /^Next →$/ }).click();
+    await page.getByTestId("request-slip").waitFor({ timeout: 8000 });
 
     console.log("[3] run audit -> live scan log streams real step events");
-    await page.getByRole("button", { name: /Run audit/i }).click();
+    await page.getByTestId("run-audit").click();
 
     // The live scan log appears (NOT the old static "Checking the public record" loader).
     // It is now the HERO of the loading state — a solid framed panel headed "Checking…".
