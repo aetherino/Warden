@@ -1,13 +1,176 @@
 @import "tailwindcss";
 
+/* ── Warden · "archival record on white paper" ───────────────────────────────
+   LITERAL WHITE base. Warm ink text. Hairline rules. The ONLY severity color is
+   the tier accent (and even then only as a left edge-bar + chip — never an
+   alarm-colored card background). No green anywhere; absence is neutral, never
+   reassuring. */
+
 :root {
-  --background: #0a0a0f;
-  --foreground: #e8e8f0;
+  --paper: #ffffff;        /* literal white */
+  --ink: #1c1b18;          /* warm near-black ink */
+  --ink-soft: #5a564e;     /* soft warm grey ink */
+  --ink-faint: #8b867b;    /* faint label ink */
+  --rule: rgba(28, 27, 24, 0.12);   /* hairline rule */
+  --rule-soft: rgba(28, 27, 24, 0.07);
+
+  /* Tier accents — the sole severity signal, tuned for white. NO GREEN. */
+  --tier-act: #c8362b;     /* red */
+  --tier-address: #b8791a; /* amber */
+  --tier-aware: #3c6e91;   /* steel blue */
+  --tier-context: #6e6a60; /* neutral slate-taupe */
+  --tier-none: #6e6a60;
+
+  --font-display: var(--font-display), Georgia, serif;
+  --font-body: var(--font-body), Georgia, serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  overflow: hidden;
+  font-family: var(--font-body);
+  font-weight: 400;
+  /* dossiers scroll — overflow:hidden removed deliberately. */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern", "liga", "onum" 1;
+}
+
+/* Faint paper grain so the white never reads as flat/empty — base stays white. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+/* Display serif — expressive, slightly tightened. */
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ── Tier helpers ──────────────────────────────────────────────────────────── */
+.tier-act    { --accent: var(--tier-act); }
+.tier-address{ --accent: var(--tier-address); }
+.tier-aware  { --accent: var(--tier-aware); }
+.tier-context{ --accent: var(--tier-context); }
+.tier-none   { --accent: var(--tier-none); }
+
+/* Paper card raised on white. The tier color appears ONLY as the left edge bar +
+   chip — the card surface itself is always near-white. */
+.paper-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid var(--rule-soft);
+  border-left: 3px solid var(--accent, var(--tier-context));
+  box-shadow:
+    0 1px 0 rgba(28, 27, 24, 0.02),
+    0 12px 30px -22px rgba(28, 27, 24, 0.35);
+}
+
+/* The loud ACT lead card: larger type + heavier rule + a slightly stronger lift.
+   Loudness comes from SIZE / weight / position — never a new color. */
+.paper-card--lead {
+  border-left-width: 6px;
+  box-shadow:
+    0 1px 0 rgba(28, 27, 24, 0.03),
+    0 26px 60px -30px rgba(200, 54, 43, 0.30);
+}
+
+/* Tier chip — the sole severity badge. Tinted text on a faint tint of the accent. */
+.tier-chip {
+  color: var(--accent, var(--tier-context));
+  background: color-mix(in srgb, var(--accent, var(--tier-context)) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--tier-context)) 34%, #fff);
+}
+
+/* A neutral (origin / suppressed / record) chip — always slate, never tier-colored. */
+.neutral-chip {
+  color: var(--ink-soft);
+  background: rgba(28, 27, 24, 0.045);
+  border: 1px solid var(--rule);
+}
+
+.hairline { border-color: var(--rule); }
+.hairline-soft { border-color: var(--rule-soft); }
+
+/* ── Orchestrated load reveal ──────────────────────────────────────────────── */
+@keyframes warden-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes warden-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.reveal {
+  opacity: 0;
+  animation: warden-rise 0.62s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.reveal-fade {
+  opacity: 0;
+  animation: warden-fade 0.8s ease forwards;
+}
+
+/* ── Audit progress (real motion while the brain works) ────────────────────── */
+@keyframes warden-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+.warden-pulse-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--ink);
+  animation: warden-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes warden-dots {
+  0%   { content: ""; }
+  25%  { content: "."; }
+  50%  { content: ".."; }
+  75%  { content: "..."; }
+  100% { content: ""; }
+}
+.warden-ellipsis::after {
+  content: "";
+  animation: warden-dots 1.4s steps(1) infinite;
+}
+
+@keyframes warden-scan {
+  0%   { transform: scaleX(0.1); opacity: 0.35; transform-origin: left; }
+  50%  { transform: scaleX(1);   opacity: 1;    transform-origin: left; }
+  100% { transform: scaleX(0.1); opacity: 0.35; transform-origin: left; }
+}
+.warden-scan-bar {
+  display: inline-block;
+  width: 64px;
+  height: 2px;
+  background: var(--ink-soft);
+  animation: warden-scan 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-fade { animation: none; opacity: 1; transform: none; }
+  .warden-pulse-dot, .warden-ellipsis::after, .warden-scan-bar { animation: none; }
+  .warden-scan-bar { transform: scaleX(0.6); }
+}
+
+/* Selection in warm ink instead of default blue. */
+::selection {
+  background: rgba(28, 27, 24, 0.12);
+  color: var(--ink);
 }
