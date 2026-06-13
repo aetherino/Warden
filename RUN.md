@@ -109,3 +109,35 @@ At that point, swap the SQLite cache for Postgres (Supabase or Vercel-Marketplac
 ## Known v1 limits (tracked in ISSUES.md)
 - Single source (CPSC). Triage/retrieval can vary on noisy keyword pools; the seeded basket is
   the reliable demo path. The §7 confidence pipeline and §11 open-inference judge are not yet built.
+
+## CLI (harness/warden/cli.py)
+
+A stdlib+httpx HTTP client that mirrors all web UI capabilities — no harness internals imported.
+Requires the brain to be running on `:8787` (or set `WARDEN_SERVICE_URL`).
+
+```bash
+cd harness
+
+# Health check
+./.venv/bin/python -m warden.cli health
+
+# Audit one or more items (pretty human output)
+./.venv/bin/python -m warden.cli audit "portable space heater" --zip 48503 --tap
+
+# With proximity context flags
+./.venv/bin/python -m warden.cli audit "old paint" "baby monitor" --zip 90210 \
+  --near-farmland --old-home
+
+# Live streaming scan (prints each step as it arrives, then the dossier)
+./.venv/bin/python -m warden.cli audit "portable space heater" --zip 48503 --stream
+
+# Raw JSON (for agents / scripts)
+./.venv/bin/python -m warden.cli audit "portable space heater" --json | python -m json.tool
+
+# Override brain URL (e.g. via cloudflared tunnel)
+./.venv/bin/python -m warden.cli audit "item" --url https://my-tunnel.trycloudflare.com
+```
+
+Context flags for `audit`: `--zip Z`, `--tap` (water_source=tap), `--near-airport`,
+`--near-military-base`, `--near-farmland`, `--near-industrial`, `--old-home`, `--well-water`.
+Use `--help` on any subcommand for full flag reference.
