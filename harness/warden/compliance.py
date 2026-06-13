@@ -302,3 +302,60 @@ def confirm_recall(item: str, rec: dict, *, client: httpx.Client | None = None,
     finally:
         if own:
             client.close()
+
+
+# --------------------------------------------------------------------------- #
+# Judge surfacing (UI "judge inspection"). These helpers translate the gates
+# that ACTUALLY ran in _build_finding / confirm_recall into the per-finding
+# `judge` contract the frontend consumes. Nothing here is fabricated: each entry
+# reflects a deterministic check whose result we already computed.
+# --------------------------------------------------------------------------- #
+
+
+def confirm_detail(rec: dict, reason: str) -> str:
+    """Human-readable line describing the §3 re-fetch confirm result for a CPSC recall."""
+    rn = str(rec.get("recall_number") or "").strip() or "?"
+    loc = f"RecallNumber {rn}"
+    if reason == "ok":
+        return f"re-fetched {loc}; item identifier present at locator"
+    if reason == "ok_hazard":
+        return f"re-fetched {loc}; stated hazard category present at locator"
+    if reason == "identifier_not_in_record":
+        return f"re-fetched {loc} but neither the item nor the hazard appeared in the live record"
+    if reason.startswith("http_"):
+        return f"re-fetch of {loc} returned {reason.replace('http_', 'HTTP ')}"
+    if reason.startswith("fetch_error"):
+        return f"re-fetch of {loc} failed: {reason.split(':', 1)[-1]}"
+    return f"re-fetch of {loc}: {reason}"
+
+
+def judge_checks(*, severity_basis_substituted: bool, action_from_model: bool,
+                 why_redacted: bool, condition_redacted: bool) -> list[dict]:
+    """The deterministic gates that ran on a CPSC finding, as {name, status} entries.
+
+    `status` is "pass" when the gate cleared cleanly, "info" when a benign substitution
+    happened (e.g. the action fell back to the recall's verbatim remedy, which is the
+    intended fidelity backstop, not a failure), and "redacted" when a free-text field
+    was scrubbed for a banned token. Derived only from results already computed — no
+    check is listed that did not run.
+    """
+    checks: list[dict] = [
+        {"name": "matched at locator", "status": "pass"},
+    ]
+    # Hazard-type was constrained to the recall's own categories (always runs).
+    checks.append({"name": "hazard constrained to recall category", "status": "pass"})
+    # severity_basis compliance scan.
+    checks.append({
+        "name": "compliance scan (severity basis)",
+        "status": "info" if severity_basis_substituted else "pass",
+    })
+    # action fidelity / traced to source.
+    checks.append({
+        "name": "action traced to source",
+        "status": "pass" if action_from_model else "info",
+    })
+    if why_redacted:
+        checks.append({"name": "compliance scan (rationale)", "status": "redacted"})
+    if condition_redacted:
+        checks.append({"name": "compliance scan (condition)", "status": "redacted"})
+    return checks

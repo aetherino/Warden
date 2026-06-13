@@ -23,14 +23,18 @@ def _today() -> str:
     return datetime.date.today().isoformat()
 
 
-def resolve_item(item: str, context: dict | None, *, use_cache: bool = True) -> list[dict]:
+def resolve_item(item: str, context: dict | None, *, use_cache: bool = True,
+                 rejected_sink: list[dict] | None = None) -> list[dict]:
     if use_cache:
         cached = store.get(item)
         if cached is not None:
             return cached
     try:
         recalls = cpsc.search_recalls(item)
-        cpsc_findings = triage.triage_item(item, recalls, context)  # retries internally on error/empty
+        # Thread the per-request rejected sink so DROPPED candidates surface in the dossier
+        # (concurrency-safe — each request owns its own list).
+        cpsc_findings = triage.triage_item(item, recalls, context,
+                                           rejected_sink=rejected_sink)  # retries internally
     except Exception as e:  # graceful degradation (§9): one slow/failed item never 500s the dossier
         import sys
         print(f"[warden] resolve_item({item!r}) failed after retries: {type(e).__name__}: {e}",
@@ -58,11 +62,21 @@ def build_dossier(items: list[str], context: dict | None = None, *, use_cache: b
     items = [i.strip() for i in items if i and i.strip()]
     all_findings: list[dict] = []
     record_statements: list[dict] = []
+    # Per-request rejected collector (concurrency-safe: one list per item, merged below).
+    rejected: list[dict] = []
 
     # Resolve items concurrently so N items ≈ one item's latency (each does CPSC + an LLM call).
     if items:
+        item_sinks: list[list[dict]] = [[] for _ in items]
+
+        def _resolve(idx_it):
+            idx, it = idx_it
+            return resolve_item(it, context, use_cache=use_cache, rejected_sink=item_sinks[idx])
+
         with ThreadPoolExecutor(max_workers=min(6, len(items))) as ex:
-            resolved = list(ex.map(lambda it: resolve_item(it, context, use_cache=use_cache), items))
+            resolved = list(ex.map(_resolve, enumerate(items)))
+        for sink in item_sinks:
+            rejected.extend(sink)
     else:
         resolved = []
 
@@ -114,6 +128,9 @@ def build_dossier(items: list[str], context: dict | None = None, *, use_cache: b
         "findings": primary,
         "suppressed": suppressed,
         "record_statements": record_statements,
+        # Candidates the model proposed but the deterministic gates DROPPED (judge-inspection
+        # surface). Empty list is fine. Capped to keep the payload bounded.
+        "rejected": rejected[:12],
         "checked_sources": _SOURCES_CHECKED,
         "disclaimer": (
             "Warden reports the state of the public record as of the date shown — "

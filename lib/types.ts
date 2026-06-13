@@ -8,6 +8,33 @@ export interface Source {
   locator: string;
 }
 
+// Judge inspection (rubric §3/§7) — the reasoning + deterministic gates the runtime
+// ran for a surfaced finding. Lets the UI build an "agentic flow sight" / judge view.
+export type JudgeCheckStatus = "pass" | "info" | "redacted";
+
+export interface JudgeCheck {
+  name: string;
+  status: JudgeCheckStatus;
+}
+
+export interface Judge {
+  // The triage/calibration reasoning (one line).
+  why: string;
+  // The §3 re-fetch / live-source confirm result.
+  confirmed: { ok: boolean; detail: string };
+  // The deterministic gates that actually ran (no fabricated checks).
+  checks: JudgeCheck[];
+  source_kind: "recall" | "epa_record" | "prop65_notice";
+}
+
+// A candidate the model proposed but the deterministic gates DROPPED (judge inspection).
+export interface RejectedCandidate {
+  item: string;
+  candidate: string; // recall # or notice/title
+  reason: "not_confirmed" | "uncompliable" | "not_relevant" | "duplicate";
+  detail: string;
+}
+
 export interface Finding {
   item: string;
   tier: Tier;
@@ -22,6 +49,7 @@ export interface Finding {
   source: Source;
   as_of?: string;
   image?: string | null;
+  judge?: Judge;
 }
 
 export interface RecordStatement {
@@ -56,6 +84,7 @@ export interface Dossier {
   findings: Finding[];
   suppressed: Finding[];
   record_statements: RecordStatement[];
+  rejected?: RejectedCandidate[];
   checked_sources: string[];
   disclaimer: string;
   error?: string;

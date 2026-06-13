@@ -108,25 +108,46 @@ def _build_finding(item: str, f: dict, rec: dict) -> dict | None:
 
     # Fix 1: severity_basis — scan, and substitute a neutral recall line on any hit.
     severity_basis = (f.get("severity_basis") or "").strip()
+    severity_basis_substituted = False
     if not severity_basis or not compliance.is_compliant(severity_basis):
         severity_basis = compliance.neutral_severity_basis(rec) or ""
+        severity_basis_substituted = True
         if not severity_basis:
             return None  # cannot state a compliant basis -> don't surface
 
     # Fix 3: action must trace to the recall; else render Remedies verbatim.
-    action = compliance.compliant_action(f.get("action") or "", rec)
+    model_action = f.get("action") or ""
+    action = compliance.compliant_action(model_action, rec)
     if not action:
         return None  # no recall-traced, compliant action -> don't surface
+    # The model's action was accepted verbatim only if it was clean AND traced; otherwise
+    # we fell back to the recall's Remedies (the fidelity backstop) — note which happened.
+    action_from_model = bool(
+        model_action
+        and compliance.is_compliant(model_action)
+        and compliance.action_traces_to_recall(model_action, rec)
+    )
 
     # `why` is user-facing calibration text -> scan it too (§7: all schema fields).
     why = (f.get("why") or "").strip()
-    if why and not compliance.is_compliant(why):
+    why_redacted = bool(why and not compliance.is_compliant(why))
+    if why_redacted:
         why = ""
 
     # `condition` is rendered for ADDRESS/ACT -> scan it too.
     condition = f.get("condition")
-    if isinstance(condition, str) and condition and not compliance.is_compliant(condition):
+    condition_redacted = bool(
+        isinstance(condition, str) and condition and not compliance.is_compliant(condition)
+    )
+    if condition_redacted:
         condition = None
+
+    # The triage rationale for the `judge.why`: prefer the (compliant) model `why`, else
+    # synthesize a one-line factual statement of what the gate concluded.
+    judge_why = why or (
+        f"Triaged to {f.get('tier', 'AWARE')}: this CPSC recall matched the item and "
+        f"re-confirmed against the live record."
+    )
 
     return {
         "item": item,
@@ -147,12 +168,30 @@ def _build_finding(item: str, f: dict, rec: dict) -> dict | None:
         "remedies": rec.get("remedies") or [],  # carry the recall's verbatim remedy (fix 3)
         "as_of": rec.get("last_publish") or rec.get("date") or "",
         "image": rec.get("image"),
+        # Judge scaffold (UI "judge inspection"). `confirmed` is filled in by triage_item
+        # AFTER the §3 re-fetch confirm runs. `checks` reflects only the gates that ran here.
+        "judge": {
+            "why": judge_why,
+            "checks": compliance.judge_checks(
+                severity_basis_substituted=severity_basis_substituted,
+                action_from_model=action_from_model,
+                why_redacted=why_redacted,
+                condition_redacted=condition_redacted,
+            ),
+            "source_kind": "recall",
+        },
     }
 
 
 def triage_item(item: str, recalls: list[dict], context: dict | None = None,
-                *, max_recalls: int = 6) -> list[dict]:
-    """Return a list of grounded findings (joined back to the real recall for url/locator)."""
+                *, max_recalls: int = 6, rejected_sink: list[dict] | None = None) -> list[dict]:
+    """Return a list of grounded findings (joined back to the real recall for url/locator).
+
+    `rejected_sink`, when provided, collects per-request candidates the gates DROPPED
+    (recall# + reason + detail) so build_dossier can surface a dossier-level `rejected`
+    array. It is a PER-REQUEST list threaded by the caller — concurrency-safe, unlike the
+    module-global LAST_REJECTED (kept only as a verifier/log convenience).
+    """
     if not recalls:
         return []
     recalls = recalls[:max_recalls]  # cap input -> bounded output + latency
@@ -211,24 +250,49 @@ def triage_item(item: str, recalls: list[dict], context: dict | None = None,
         raise last_exc  # all attempts errored -> let resolve_item degrade gracefully (§9)
 
     out, rejected = [], []
+    seen_numbers: set[str] = set()
+
+    def _reject(candidate, reason: str, detail: str) -> None:
+        rec_entry = {"item": item, "candidate": str(candidate or "?"),
+                     "reason": reason, "detail": detail}
+        rejected.append(rec_entry)
+        if rejected_sink is not None:
+            rejected_sink.append(rec_entry)
+
     for f in findings_in:
-        rec = by_number.get(str(f.get("recall_number")))
+        rn = str(f.get("recall_number") or "")
+        rec = by_number.get(rn)
         if not rec:
-            continue  # drop any finding that doesn't map to a real fetched recall (anti-hallucination)
+            # A finding that doesn't map to a real fetched recall (anti-hallucination): the
+            # model proposed a recall# not in the search results -> not relevant / invented.
+            _reject(rn or (f.get("recall_number") or "?"), "not_relevant",
+                    "model returned a recall number that was not in the fetched search results")
+            continue
+        if rn in seen_numbers:
+            _reject(rn, "duplicate", f"RecallNumber {rn} already surfaced for this item")
+            continue
         finding = _build_finding(item, f, rec)
         if finding is None:
-            rejected.append({"recall_number": rec.get("recall_number"),
-                             "reason": "uncompliable"})
+            _reject(rec.get("recall_number"), "uncompliable",
+                    "no recall-traced, compliant severity basis or action could be rendered")
             continue
         # §3 re-fetch confirm (rubric §3): a finding that can't re-confirm never surfaces.
         confirmed, reason = compliance.confirm_recall(item, rec)
         if not confirmed:
-            rejected.append({"recall_number": rec.get("recall_number"),
-                             "reason": f"confirm_failed:{reason}"})
+            _reject(rec.get("recall_number"), "not_confirmed",
+                    compliance.confirm_detail(rec, reason))
             continue
+        # Finalize the judge's `confirmed` block from the §3 re-fetch result.
+        finding["judge"]["confirmed"] = {
+            "ok": True,
+            "detail": compliance.confirm_detail(rec, reason),
+        }
+        seen_numbers.add(rn)
         out.append(finding)
 
     # Expose the rejected sink without changing the list contract dossier.py depends on.
+    # (module-global kept for verifier/log convenience; the per-request sink above is the
+    # concurrency-safe path build_dossier threads through.)
     global LAST_REJECTED
     LAST_REJECTED = rejected
     if rejected:

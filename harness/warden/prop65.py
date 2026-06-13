@@ -222,6 +222,25 @@ def _to_finding(item: str, rec: dict) -> dict:
             "locator": f"AG Notice {ag}",
         },
         "as_of": date_filed,
+        # Judge surfacing (UI "judge inspection"). A 60-day notice is, by construction,
+        # ubiquitous noise -> calibrated to CONTEXT and suppressed; nothing escalated.
+        "judge": {
+            "why": (
+                f"Matched CA OAG 60-day notice {ag} by product keyword; a notice is an "
+                f"unproven allegation and Prop 65 notices blanket nearly everything sold in "
+                f"CA, so it is calibrated to CONTEXT (suppressed noise), not an action."
+            ),
+            "confirmed": {
+                "ok": True,
+                "detail": f"cites live OAG notice {ag} (re-fetchable per-notice page + filed PDF).",
+            },
+            "checks": [
+                {"name": "matched at locator", "status": "pass"},
+                {"name": "framed as alleged, not proven", "status": "pass"},
+                {"name": "calibrated ubiquitous -> CONTEXT (suppressed)", "status": "info"},
+            ],
+            "source_kind": "prop65_notice",
+        },
     }
 
 

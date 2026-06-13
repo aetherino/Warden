@@ -52,11 +52,14 @@ def _ev(seq: int, phase: str, source: str, status: str, detail: str,
 
 
 def _resolve_item_streaming(item: str, context: dict | None, *, use_cache: bool,
-                            emit) -> list[dict]:
+                            emit, rejected_sink: list[dict] | None = None) -> list[dict]:
     """Resolve one item, emitting real step events through `emit(phase, source, status, detail, ...)`.
 
     Mirrors dossier.resolve_item's logic exactly (cache → CPSC search → triage → Prop 65,
     graceful per-source degradation §9) but narrates each real step as it lands.
+
+    `rejected_sink` collects the per-request candidates the gates DROPPED (threaded into
+    triage_item) so the terminal dossier carries the same `rejected` array as /resolve.
     """
     if use_cache:
         cached = store.get(item)
@@ -89,7 +92,9 @@ def _resolve_item_streaming(item: str, context: dict | None, *, use_cache: bool,
         else:
             emit("search", "CPSC recalls", "empty",
                  f"CPSC · {item} → no recalls returned", item=item)
-        cpsc_findings = triage.triage_item(item, recalls, context)
+        before = len(rejected_sink) if rejected_sink is not None else 0
+        cpsc_findings = triage.triage_item(item, recalls, context,
+                                           rejected_sink=rejected_sink)
         if cpsc_findings:
             # One event per surfaced finding (e.g. "space heater → ACT: fire hazard [cited]").
             for f in cpsc_findings:
@@ -99,6 +104,13 @@ def _resolve_item_streaming(item: str, context: dict | None, *, use_cache: bool,
         elif n:
             emit("triage", "CPSC recalls", "empty",
                  f"{item} → no relevant recall after triage", item=item)
+        # §12 judge step: narrate candidates the deterministic gates set aside (false
+        # positives / unconfirmed / uncompliable), so the live log shows the JUDGING.
+        dropped = (len(rejected_sink) - before) if rejected_sink is not None else 0
+        if dropped:
+            emit("judge", "CPSC recalls", "info",
+                 f"{item} → set aside {dropped} keyword false-positive"
+                 f"{'s' if dropped != 1 else ''} / unconfirmed", item=item)
     except Exception as e:  # graceful degradation (§9): one failed item never 500s the run.
         print(f"[warden] resolve_item({item!r}) failed after retries: {type(e).__name__}: {e}",
               file=sys.stderr)
@@ -162,6 +174,8 @@ def build_dossier_events(items: list[str], context: dict | None = None,
         q.put(_ev(s, phase, source, status, detail, item=item, tier=tier))
 
     results: dict[str, list[dict]] = {}
+    # Per-request rejected collector (one sink per item; merged into the terminal dossier).
+    rejected_sinks: dict[str, list[dict]] = {it: [] for it in items}
 
     def worker() -> None:
         try:
@@ -172,7 +186,8 @@ def build_dossier_events(items: list[str], context: dict | None = None,
                 with ThreadPoolExecutor(max_workers=min(6, len(items))) as ex:
                     futs = {
                         it: ex.submit(_resolve_item_streaming, it, context,
-                                      use_cache=use_cache, emit=emit)
+                                      use_cache=use_cache, emit=emit,
+                                      rejected_sink=rejected_sinks[it])
                         for it in items
                     }
                     for it, fut in futs.items():
@@ -243,6 +258,10 @@ def build_dossier_events(items: list[str], context: dict | None = None,
 
     all_findings.extend(results.get("__epa__", []))
 
+    rejected: list[dict] = []
+    for it in items:
+        rejected.extend(rejected_sinks.get(it, []))
+
     primary = [f for f in all_findings if f.get("tier") != "CONTEXT"]
     suppressed = [f for f in all_findings if f.get("tier") == "CONTEXT"]
     primary.sort(key=lambda f: (TIER_RANK.get(f.get("tier"), 9), f.get("item", "")))
@@ -268,6 +287,8 @@ def build_dossier_events(items: list[str], context: dict | None = None,
         "findings": primary,
         "suppressed": suppressed,
         "record_statements": record_statements,
+        # Candidates the model proposed but the deterministic gates DROPPED (matches /resolve).
+        "rejected": rejected[:12],
         "checked_sources": _SOURCES_CHECKED,
         "disclaimer": (
             "Warden reports the state of the public record as of the date shown — "
