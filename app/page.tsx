@@ -3,6 +3,7 @@
 import { useState } from "react";
 import ShieldLoader from "@/components/ShieldLoader";
 import ScanLog from "@/components/ScanLog";
+import AuthMasthead from "@/components/AuthMasthead";
 import type { ShieldTier } from "@/components/InvisibleShield";
 import type { Dossier, Finding, ScanEvent, Tier } from "@/lib/types";
 
@@ -293,9 +294,14 @@ export default function Home() {
             the public record, audited
           </span>
         </div>
-        <span className="hidden font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-faint)] sm:block">
-          № 001
-        </span>
+        <div className="flex items-center gap-5">
+          {/* Auth affordance — renders only when Clerk keys are present (inert in the
+              login-free demo). */}
+          <AuthMasthead />
+          <span className="hidden font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-faint)] sm:block">
+            № 001
+          </span>
+        </div>
       </header>
       <div className="relative z-10 mx-auto max-w-6xl px-6 sm:px-8">
         <div className="border-t hairline" />

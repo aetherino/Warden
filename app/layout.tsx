@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Newsreader, IBM_Plex_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import { authEnabled } from "@/lib/auth";
 import "./globals.css";
 
 // Typography carries the "archival record on white paper" voice.
@@ -41,12 +43,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Auth is flag-gated and INERT by default. When Clerk keys are absent we render
+  // children unwrapped — byte-for-byte the same tree the demo ships today. Only
+  // when authEnabled do we wrap in <ClerkProvider>, and per Core 3 + cache-
+  // components guidance the provider lives INSIDE <body>, not around <html>.
+  const body = authEnabled ? <ClerkProvider>{children}</ClerkProvider> : children;
+
   return (
     <html
       lang="en"
       className={`${fraunces.variable} ${newsreader.variable} ${plexMono.variable}`}
     >
-      <body>{children}</body>
+      <body>{body}</body>
     </html>
   );
 }

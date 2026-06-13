@@ -65,6 +65,42 @@ Screenshots land in `/tmp/warden_scan/`.
   record statement** (never silence, never an all-clear).
 - Results are cached in SQLite (`harness/warden.db`) keyed per item.
 
+## Auth (optional, off by default)
+Clerk (`@clerk/nextjs` v7 / Core 3) is **scaffolded but INERT**. With no Clerk env vars
+the app builds and runs exactly as the demo does today — no login wall, no auth UI, no
+Clerk initialization. Auth is being prepped for a future "save my home profile" /
+enrollment feature; **it does not gate the demo**.
+
+**The on/off switch** is a single flag, `authEnabled` in `lib/auth.ts`:
+```ts
+export const authEnabled = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+```
+Everything keys off it: `app/layout.tsx` only wraps the app in `<ClerkProvider>` when on
+(provider sits inside `<body>`, per Core 3 + cache-components guidance); `middleware.ts`
+runs `clerkMiddleware()` when on and a pure pass-through (`NextResponse.next()`) when off
+— and only lazily `require`s Clerk inside the on-branch, so the OFF path never imports or
+initializes Clerk; the masthead Sign-in link / `<UserButton/>` (`components/AuthMasthead.tsx`)
+renders nothing when off.
+
+**To turn it on**, set both keys, then restart `next dev`/rebuild:
+```bash
+# Option A — Vercel Marketplace (once the project is Vercel-linked); auto-provisions both keys:
+vercel integration add clerk
+
+# Option B — manually, in .env.local (gitignored):
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+# optional, point Clerk at the scaffolded routes:
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+```
+Sign-in/up routes already exist at `app/sign-in/[[...sign-in]]` and `app/sign-up/[[...sign-up]]`.
+
+**No routes are protected yet** — even with keys on, the demo (intake → audit → live scan →
+dossier) stays fully open. To protect a route later, add `createRouteMatcher` +
+`await auth.protect()` inside the `clerkMiddleware()` callback in `middleware.ts`
+(`auth()`, `clerkClient()` are async in Core 3).
+
 ## Deploying later (not needed for v1)
 The brain is a FastAPI service; expose it to a Vercel-hosted UI with
 `cloudflared tunnel --url http://127.0.0.1:8787` and set `WARDEN_SERVICE_URL` to the tunnel URL.
