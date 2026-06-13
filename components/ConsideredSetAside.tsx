@@ -11,24 +11,41 @@ import { getRejected, rejectedReasonLabel } from "@/lib/judge";
 
 export default function ConsideredSetAside({ dossier }: { dossier: Dossier }) {
   const rejected = getRejected(dossier);
-  if (rejected.length === 0) return null;
+  // §11 pathway-layer rejects are §10/verifier-only — NEVER rendered as hazard chains
+  // (rendering rejected hazard chains is the cardinal sin via the discovery door). We
+  // surface ONLY a neutral COUNT here, inside the existing set-aside affordance, with no
+  // pathway/agent/trigger detail. Never alarming.
+  const pathwayRejectCount = Array.isArray(dossier.discovery_rejected)
+    ? dossier.discovery_rejected.length
+    : 0;
+
+  if (rejected.length === 0 && pathwayRejectCount === 0) return null;
 
   return (
     <details
       className="reveal rounded-[3px] border bg-white/70 px-5 py-3.5 hairline-soft"
       data-testid="considered-set-aside"
     >
-      <summary className="inline-flex cursor-pointer items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--ink-soft)] transition-colors hover:text-[var(--ink)]">
+      <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--ink-soft)] transition-colors hover:text-[var(--ink)]">
         <span aria-hidden className="disclosure-caret text-[var(--ink-faint)]">
           ›
         </span>
-        Considered &amp; set aside — {rejected.length} weighed, not surfaced
+        Considered &amp; set aside — {rejected.length + pathwayRejectCount} weighed, not surfaced
       </summary>
 
       <p className="mt-3 max-w-prose font-mono text-[11px] leading-[1.6] text-[var(--ink-faint)]">
         Warden weighed these and set them aside — they didn&rsquo;t clear the bar to
         show as findings. Listed for the record, with the reason.
       </p>
+
+      {/* §11 pathway-layer rejects: a NEUTRAL count only — never the pathway/agent/
+          trigger (verifier-only; rendering rejected hazard chains is the cardinal sin). */}
+      {pathwayRejectCount > 0 && (
+        <p className="mt-3 border-t border-dashed hairline-soft pt-3 font-mono text-[11px] leading-[1.6] text-[var(--ink-faint)]">
+          {pathwayRejectCount} environmental pathway{pathwayRejectCount === 1 ? "" : "s"}{" "}
+          considered and set aside (no Tier-1/2 source attested the route).
+        </p>
+      )}
 
       <ul className="mt-3 space-y-3">
         {rejected.map((r, i) => (

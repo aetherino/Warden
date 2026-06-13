@@ -10,7 +10,13 @@
 // When the backend lands the same fields in lib/types.ts, these stay compatible
 // (they describe the identical shape) and can be folded in later.
 
-import type { Finding, Dossier, Tier } from "@/lib/types";
+import type {
+  Finding,
+  Dossier,
+  Tier,
+  RecordStatement,
+  DiscoveryRecordStatement,
+} from "@/lib/types";
 
 // A single gate the judge ran. "redacted" = the gate ran but its detail is withheld
 // (rendered honestly as withheld, never hidden). Status is NOT a severity signal.
@@ -176,6 +182,87 @@ export function groupByItem(findings: Finding[]): ItemGroup[] {
     .map((g, i) => ({ g, i }))
     .sort((a, b) => a.g.topRank - b.g.topRank || a.i - b.i)
     .map(({ g }) => g);
+}
+
+// ── §11 discovery helpers ──────────────────────────────────────────────────────
+
+// A record_statements entry is a §11 DiscoveryRecordStatement (a grounded-but-empty
+// pathway) when it carries a `discovery` block; otherwise it's a plain §9 statement.
+export function isDiscoveryStatement(
+  rs: RecordStatement | DiscoveryRecordStatement
+): rs is DiscoveryRecordStatement {
+  return (
+    "discovery" in rs &&
+    !!(rs as DiscoveryRecordStatement).discovery &&
+    !("suppressed_context" in rs)
+  );
+}
+
+export function splitRecordStatements(
+  list: (RecordStatement | DiscoveryRecordStatement)[]
+): { plain: RecordStatement[]; discovery: DiscoveryRecordStatement[] } {
+  const plain: RecordStatement[] = [];
+  const discovery: DiscoveryRecordStatement[] = [];
+  for (const rs of list ?? []) {
+    if (isDiscoveryStatement(rs)) discovery.push(rs);
+    else plain.push(rs as RecordStatement);
+  }
+  return { plain, discovery };
+}
+
+// The surfaced-cap for ai_inferred findings (rubric §11, load-bearing): at most M=3
+// surfaced rows. They interleave by tier with the rest; overflow collapses into the
+// aggregated coverage line. Origin-blind ranking is preserved (we cap, never reorder
+// by origin) — we keep the worst-tier ai_inferred rows and demote the rest.
+export const SURFACED_DISCOVERY_CAP = 3;
+
+// Returns { surfaced, overflow } from a list of findings. `surfaced` keeps every
+// user_listed/curated finding plus up to M ai_inferred (the worst-tier M). `overflow`
+// is the demoted ai_inferred findings (routed into the aggregated coverage line as
+// synthetic statements). curated_pathway findings are NOT capped (they are vetted).
+export function capSurfacedDiscovery(findings: Finding[]): {
+  surfaced: Finding[];
+  overflow: Finding[];
+} {
+  const inferred = findings.filter((f) => f.origin === "ai_inferred");
+  if (inferred.length <= SURFACED_DISCOVERY_CAP) {
+    return { surfaced: findings, overflow: [] };
+  }
+  const ranked = [...inferred].sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier]);
+  const keep = new Set(ranked.slice(0, SURFACED_DISCOVERY_CAP));
+  const surfaced: Finding[] = [];
+  const overflow: Finding[] = [];
+  for (const f of findings) {
+    if (f.origin === "ai_inferred" && !keep.has(f)) overflow.push(f);
+    else surfaced.push(f);
+  }
+  return { surfaced, overflow };
+}
+
+// Turn a demoted ai_inferred finding into a DiscoveryRecordStatement-shaped line so it
+// folds into the aggregated coverage list (no per-pathway alarm row).
+export function findingToCoverageStatement(f: Finding): DiscoveryRecordStatement {
+  return {
+    kind: "record_statement",
+    origin: f.origin,
+    pathway_id: f.discovery?.pathway_id ?? f.item,
+    trigger_signal: f.discovery?.trigger_signal ?? "",
+    discovery: {
+      grounding: f.discovery?.grounding ?? {},
+      pathway:
+        f.discovery?.pathway ?? {
+          source_category: "",
+          source_to_media_mechanism: "",
+          environmental_media: "",
+          point_of_exposure: "",
+          exposure_route: "",
+          receptor_population: "",
+        },
+    },
+    checked_sources: [f.source?.name].filter(Boolean) as string[],
+    as_of: f.as_of ?? "",
+    statement: `Checked ${f.source?.name ?? "the record"} for "${f.item}" — set aside below the surfaced cap.`,
+  };
 }
 
 // Format an as_of that may be an ISO date OR a stamped string like
