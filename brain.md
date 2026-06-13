@@ -17,7 +17,7 @@ A consumer hazard-audit agent. You list what you own (+ non-medical context); it
 - **Provenance is mechanical.** Every finding carries `source.url` + `source.locator`; "confirmed" means the URL returns 200 AND the fact appears at the locator. Unconfirmed → dropped to `rejected`. No claim exceeds what the source states.
 - **Calibration over alarm.** Over-alarming is the cardinal sin (it's what competitors get wrong). Ubiquitous warnings ≤ CONTEXT; regional baselines ≤ AWARE unless a stated condition applies.
 - **Actions trace to a source.** Every `action` quotes a regulator/source instruction; Warden originates no advice.
-- **Hypotheses are reasoning artifacts, never claims.** (Contextual discovery, §11.) An inferred pathway must pass a search-grounded judge before investigation, and unconfirmed → calm record statement, never a speculative alarm.
+- **Hypotheses are reasoning artifacts, never claims.** (Contextual discovery, §11.) **Two gates in series:** a search-grounded, default-reject judge proves the *pathway* is a real established route (mechanical domain allowlist; string-linkage + anti-equivocation; agent re-derived independently) → then §3 proves the *finding*. AI-inferred items are labeled by `origin` and carry two receipts (pathway grounding + finding source). Unconfirmed → calm record statement, never a speculative alarm. Rejected pathways vanish to `discovery_rejected.json` (verifier-only). Surface-capped (≤3 ai_inferred rows; empties aggregate, bottom-ranked). Shield + tiering are origin-blind.
 
 ## 3. Architecture mental model
 ```
@@ -38,7 +38,7 @@ A consumer hazard-audit agent. You list what you own (+ non-medical context); it
 - **3D:** three.js 0.177.0 · @react-three/fiber 9.6.1 · @react-three/drei 10.7.7.
 - **Harness:** self-hosted Python + Anthropic Agent SDK (not yet scaffolded — waiting on finalized schema + source recon).
 - **Data:** Supabase Postgres.
-- **Host:** Vercel (Fluid Compute; supports Python natively — relevant for the runtime agent). Remote: `github.com/glazzerino/Warden`.
+- **Host:** Vercel (Fluid Compute; supports Python natively — relevant for the runtime agent). Remote: `github.com/aetherino/Warden`.
 
 ## 5. Repo layout
 ```
@@ -62,7 +62,8 @@ harness/                  (pending) Python Agent SDK build-time crawler
 - **Golden set is AI-labeled but leakage-proof:** ground-truth ACT cases, separate labeler agent, dev/holdout split.
 
 ## 7. Open considerations / watch-list
-- **Schema change incoming:** per-finding schema gains `origin: user_listed | ai_inferred` + a pathway-grounding citation (from the open-inference design workflow). Don't build the harness data model until that lands.
+- **Schema landed:** per-finding now has `origin ∈ {user_listed,curated_pathway,ai_inferred}` + a `discovery` block (pathway + grounding receipt); plus a `record_statement` object and `discovery_rejected.json`. Harness data model can be built against this.
+- **Open-inference tunables must be CALIBRATED, not asserted** (see ISSUES #012): the Tier-1/2 domain allowlist, agent-matching at registry-id level (or it over-rejects PFAS), N=8/M=3 caps, the linkage co-occurrence window + transport-verb list, and negative-control re-validation each release. These are the soft spots where the rigor can silently break.
 - **three.js perf on a projector/judge laptop** — cap it, test on non-dev hardware, keep a static fallback.
 - **Live-crawl rate limits** during the demo — caching layer + seeded basket are the insurance.
 - **Blank-screen demo failure** — judge types items with no recall → must show the neutral record statement, never silence. (§9)
@@ -75,3 +76,4 @@ harness/                  (pending) Python Agent SDK build-time crawler
 
 ## 9. Evolution log
 - **2026-06-13** — Foundation: rubric v2 (+§11 contextual discovery), Next.js+three.js shield scaffold, ISSUES.md tracker, memory seeded. Two workflows in flight: open-inference §11 design + source recon. brain.md created. Baseline committed.
+- **2026-06-13** — Open-inference §11 design (8-agent adversarial workflow) applied to rubric: schema `origin`+`discovery`, extended Gate 12, search-grounded default-reject judge (domain allowlist, string-linkage, anti-equivocation), `discovery_rejected.json`, surface cap, §10 pathway legibility, origin-blind shield. Source-recon workflow still running.
