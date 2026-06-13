@@ -1,14 +1,15 @@
 # Warden — Open Issues & Project State
 
-## Status: v1+ — reskin MERGED, backend ACT/ADDRESS/CONTEXT live, §12 live agentic scan SHIPPED + verified. In flight: Clerk auth prep (flag-gated). Ready: UX rework spec (design/UX_REWORK.md). Main-loop orchestrating.
+## Status: v1+ — backend ACT/ADDRESS/CONTEXT live; §12 live scan; judge `judge`/`rejected` data; flow-sight + JUDGE INSPECTOR + by-item grouping SHIPPED & browser-verified (Chrome MCP) + e2e green (pytest 8/8, scan+inspect specs). Slogan "Stand guard over your health". Clerk prep inert. NEXT: §11 pathway system (needs Exa key) + UX rework/mobile (UX coder).
 
 ## NEXT MAJOR BUILD (user-prioritized): §11 geolocation + LLM pathway system
 After the current frontend iteration verifies: build the runtime contextual-discovery pathway system — proximity/geo prompts → Sonnet proposes exposure-pathway initiatives → adversarial search-grounded default-reject judge (propose→prosecute→declare; domain allowlist + linkage + anti-equivocation, §11) → survivors declared AI-inferred ("Checked because of your context", two receipts), rejected → discovery_rejected.json (never shown). Renders through the judge-Inspector UI being built now. Curated fast-path library (#008) + judge (#012) + initiatives (#038). Geolocation EPA-water ADDRESS path already live.
 
 ## In flight
-- Clerk auth prep (agent): flag-gated `@clerk/nextjs` scaffold — INERT without keys (demo stays login-free), activates only when Clerk keys present (`vercel integration add clerk` or .env). RUNNING.
-- UX designer — DONE → `design/UX_REWORK.md` (4-act rework: Enroll→Scan→Dossier→Initiatives; golden-circle two-register copy; boxed legibility). UX CODER queued for the later rework (#040), gated behind Clerk prep.
-- Shipped to master: reskin (f477e26) · §12 live scan + ZIP intake (4669bdb) · backend e2e suite, 8 pass (bfcaef5) · backend expansion Prop65/EPA/compliance (e6d67bc).
+- No agents running. This iteration round COMPLETE + browser-verified + e2e green (20160cf).
+- Design specs READY (design/UX_REWORK.md + design/MOBILE_UX.md); Clerk auth scaffolded inert (d2296b9).
+- QUEUED: (1) §11 geolocation+pathway system [needs Exa #002 + OpenAlex #015 + S2 decision #014] — adversarial checks render through the just-shipped Inspector; (2) UX coder = full rework + mobile-first (UX_REWORK+MOBILE_UX+#042 clever enrollment incl. stream-of-thought input + voice) + recently-viewed DB #043; (3) §7 independent-source confidence layer [Exa/OpenAlex/S2].
+- Recently shipped: judge backend (b0284fc) · flow-sight+inspector+friction (f3b8ff9) · mobile spec (53365d4) · slogan s/home/health (20160cf).
 
 ## Big Picture
 Consumer hazard-audit agent. Lists what you own → grinds public regulatory/litigation/
