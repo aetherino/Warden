@@ -9,10 +9,14 @@ from __future__ import annotations
 import datetime
 from concurrent.futures import ThreadPoolExecutor
 
-from . import cpsc, store, triage
+from . import cpsc, epa_water, prop65, store, triage
 
 TIER_RANK = {"ACT": 0, "ADDRESS": 1, "AWARE": 2, "CONTEXT": 3}
-_SOURCES_CHECKED = ["CPSC recalls"]  # v1; EPA / Prop 65 / discovery are follow-ups.
+_SOURCES_CHECKED = [
+    "CPSC recalls",
+    "CA Prop 65 (OAG 60-day notices)",
+    "EPA SDWA (ECHO)",
+]
 
 
 def _today() -> str:
@@ -26,13 +30,27 @@ def resolve_item(item: str, context: dict | None, *, use_cache: bool = True) -> 
             return cached
     try:
         recalls = cpsc.search_recalls(item)
-        findings = triage.triage_item(item, recalls, context)  # retries internally on error/empty
+        cpsc_findings = triage.triage_item(item, recalls, context)  # retries internally on error/empty
     except Exception as e:  # graceful degradation (§9): one slow/failed item never 500s the dossier
         import sys
         print(f"[warden] resolve_item({item!r}) failed after retries: {type(e).__name__}: {e}",
               file=sys.stderr)
         return []
-    store.put(item, findings)
+    # Prop 65 (per-item CONTEXT noise) degrades to [] independently of CPSC (§9).
+    try:
+        prop65_findings = prop65.search_prop65(item)
+    except Exception as e:  # noqa: BLE001
+        import sys
+        print(f"[warden] search_prop65({item!r}) failed: {type(e).__name__}: {e}", file=sys.stderr)
+        prop65_findings = []
+    findings = cpsc_findings + prop65_findings
+    # A cache-write failure degrades to "returned, not cached" — never 500s the request.
+    try:
+        store.put(item, findings)
+    except Exception as e:  # noqa: BLE001
+        import sys
+        print(f"[warden] store.put({item!r}) failed (returned, not cached): "
+              f"{type(e).__name__}: {e}", file=sys.stderr)
     return findings
 
 
@@ -64,6 +82,18 @@ def build_dossier(items: list[str], context: dict | None = None, *, use_cache: b
                 "suppressed_context": [f for f in findings if f.get("tier") == "CONTEXT"],
             })
         all_findings.extend(findings)
+
+    # EPA SDWA is CONTEXT/ZIP-driven, not item-driven: one call per request off the intake ZIP.
+    # Returning [] means no water finding (do NOT emit an all-clear); ADDRESS findings rank into
+    # the primary plan. Degrades to [] on any error (§9).
+    zip_code = (context or {}).get("zip")
+    if zip_code:
+        try:
+            all_findings.extend(epa_water.resolve_water(str(zip_code)))
+        except Exception as e:  # noqa: BLE001
+            import sys
+            print(f"[warden] resolve_water({zip_code!r}) failed: {type(e).__name__}: {e}",
+                  file=sys.stderr)
 
     primary = [f for f in all_findings if f.get("tier") != "CONTEXT"]
     suppressed = [f for f in all_findings if f.get("tier") == "CONTEXT"]

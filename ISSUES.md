@@ -1,6 +1,11 @@
 # Warden — Open Issues & Project State
 
-## Status: v1 RUNNING locally (end-to-end verified). CPSC → Python(FastAPI) Anthropic triage → SQLite cache → Next.js dossier + reacting shield. See RUN.md.
+## Status: v1 RUNNING + expanding. 4 parallel agents in flight: white particle-field reskin (worktree, runs frontend-design skill, + UX/error fixes), CA Prop 65 client (→CONTEXT), EPA water-by-ZIP client (→ADDRESS), triage hardening (compliance/§3/injection gates). Main-loop is orchestrating, not hand-coding.
+
+## In flight (parallel agents)
+- Reskin (worktree): white particle field — RUNNING (dark-blob fixed at iter3 → discrete particles; locking ACT state + polish). Merge when it reports.
+- prop65.py / epa_water.py / triage hardening (+compliance.py) / dossier integration — ALL DONE + verified end-to-end. Committed to master.
+- Backend now covers ACT (CPSC) + ADDRESS (EPA water, ZIP-driven) + CONTEXT (Prop 65) from real sources; compliance/§3/injection enforced mechanically (CPSC path).
 
 ## Big Picture
 Consumer hazard-audit agent. Lists what you own → grinds public regulatory/litigation/
@@ -41,6 +46,9 @@ Repo: github.com/aetherino/Warden (remote `origin`, branch `master`).
 - [ ] #025 — Wire EPA water (SDWA/UCMR) + CA Prop 65 sources into the runtime (v1 is CPSC-only) — Owner: TBD — P1
 - [ ] #026 — Build the §3 re-fetch verifier: v1 carries the CPSC-provided source.url but does not yet re-fetch + confirm hazard_type at the locator (drop-to-rejected) — Owner: TBD — P1
 - [ ] #027 — Deploy path: swap SQLite cache → Postgres (Supabase/Neon), expose the Python brain via `cloudflared`, set WARDEN_SERVICE_URL, deploy Next.js to Vercel — Owner: TBD — P2
+- [ ] #032 — Compliance whitelist for a CROSS-SOURCE scan: compliance.is_compliant runs only on the CPSC path today. A future global pass over EPA/Prop65 text must whitelist proper-noun "Safe Drinking Water Act" and negated "...not...unsafe" (else benign false positives) — Owner: TBD — P2
+- [ ] #028 — Visual direction gap: v1 shipped a DARK bg + iridescent SPHERE; user expected a PARTICLE SYSTEM on a WHITE/light background. Frontend judge agent evaluating + recommending the pivot. Constraint: clean/calm state must NOT imply "safe" (no green/all-clear) even on white — DECISION + likely reskin — Owner: user/main — P1
+- [ ] #029 — Chrome plugin MCP not connected in-session → UI audit running via headless Playwright as a stand-in. Connect the plugin for an in-browser manual audit — Owner: user — P2
 
 ## Resolved
 - [x] #000 — Rubric v2 written: added robustness gates (§9), orchestration visibility (§10), safety-signaling stance, golden-set leakage fixes, live-crawl guardrails (§E), all-fields compliance scan.
@@ -53,6 +61,9 @@ Repo: github.com/aetherino/Warden (remote `origin`, branch `master`).
 - [x] #022 — Direct-master-commit workflow enabled (`Bash(git push:*)` permission); PRs #1/#2/#3 squash-merged to master (rubric §11, frontend-design skill, SOURCES.md). frontend-design skill installed.
 - [x] #003 — Anthropic API key PROVIDED (in gitignored `.env`; rotate post-hackathon — shared in chat).
 - [x] #023 — v1 built + verified end-to-end: CPSC live (keyword fan-out + relevance rank) → Anthropic Sonnet triage (streaming, structured tool output, grounded citations, retry-on-empty) → SQLite cache → FastAPI `/resolve` → Next.js `/api/dossier` proxy → dossier UI + tier-reactive three.js shield. Verified: Peloton→ACT (recall 21128) cited, heater→6×ACT, empty-input→§9 record statement, page compiles. RUN.md added. (Triage reliability tracked in #024.)
+- [x] #030 — UI audit (headless Playwright, a self-verification pass): PASS on load/render/ranking/citations(26/26 cpsc.gov)/shield-reacts-red-on-ACT/CONTEXT-suppressed/compliance-clean/empty-input/0-console-errors. 5 UX polish nits → folded into the reskin. Screenshots in /tmp/warden_audit/.
+- [x] #031 — v1 adversarial review (workflow, 31 agents): 1 BLOCKER (compliance/§3/injection enforced only by system prompt) + error-handling defects → fixes dispatched (triage hardening agent; frontend fixes folded into reskin; store.put-in-try to do in dossier integration).
+- [x] #033 — Backend expansion (orchestrated, 4 agents): prop65.py (CONTEXT), epa_water.py (ADDRESS, ZIP-driven), compliance.py + triage hardening (banned-token scan, §3 re-fetch confirm, injection delimiter, retry fix), dossier.py integration (+store.put-in-try). Verified end-to-end: heater→6 ACT + Flint ZIP→ADDRESS + extension cord→CONTEXT(suppressed), all cited, empty→record statement, no 500. Closes the review BLOCKER (#031). Resolves #003.
 
 ## Decisions Log
 - 2026-06-13 — Triage-not-detection is the thesis; output is a record-state statement, never a safety verdict.
