@@ -233,3 +233,6 @@ next-env.d.ts
 .env.local
 .env.*.local
 
+
+# Playwright e2e screenshot artifacts (workspace-only)
+.e2e-shots/

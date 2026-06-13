@@ -169,6 +169,69 @@ body::before {
   .warden-scan-bar { transform: scaleX(0.6); }
 }
 
+/* ── Judge inspector — a printed receipt slip ──────────────────────────────────
+   Mono, near-solid paper, sits flush under a finding. The "machinery" voice:
+   why this tier, the confirmation, the gates that ran. Never tier-colored. */
+.receipt-panel {
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  /* faint perforation along the top edge — reads as a torn receipt */
+  background-image:
+    radial-gradient(circle at 4px 0, transparent 2px, rgba(255, 255, 255, 0.97) 2px);
+}
+
+/* The small square tick — sole severity color in scan + receipt gate rows.
+   A square (not a dot) distinguishes the gate marks from the live scan dots. */
+.tier-tick {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  background: var(--accent, var(--tier-context));
+}
+.tier-tick--hollow {
+  background: transparent;
+  border: 1px solid var(--rule);
+}
+
+/* Confirmation seal — a quiet mono affirmation that the source was re-fetched.
+   NOT a green check / not an all-clear; it's a provenance stamp (record voice). */
+.confirm-seal {
+  color: var(--ink-soft);
+  background: rgba(28, 27, 24, 0.04);
+  border: 1px dashed var(--rule);
+  border-radius: 3px;
+}
+
+/* Item-group header — the one-line summary band that opens each item section. */
+.group-band {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--rule-soft);
+  border-radius: 3px;
+}
+
+/* A faint mono count pill used in group headers + the considered-set-aside list.
+   Always slate when neutral; tier-colored variants reuse .tier-* --accent. */
+.count-pip {
+  color: var(--accent, var(--ink-soft));
+  font-variant-numeric: tabular-nums;
+}
+
+/* Disclosure caret that rotates when its <details> is open. */
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+.disclosure-caret {
+  display: inline-block;
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+details[open] > summary .disclosure-caret { transform: rotate(90deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosure-caret { transition: none; }
+}
+
 /* Selection in warm ink instead of default blue. */
 ::selection {
   background: rgba(28, 27, 24, 0.12);

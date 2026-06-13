@@ -57,9 +57,11 @@ async function run() {
     await page.getByRole("button", { name: /Run audit/i }).click();
 
     // The live scan log appears (NOT the old static "Checking the public record" loader).
+    // It is now the HERO of the loading state — a solid framed panel headed "Checking…".
     const scanLog = page.getByTestId("scan-log");
     await scanLog.waitFor({ state: "visible", timeout: 15_000 });
-    await page.getByText(/Live scan/i).first().waitFor({ timeout: 15_000 });
+    await page.getByTestId("scan-hero").waitFor({ state: "visible", timeout: 15_000 });
+    await page.getByText(/Checking/i).first().waitFor({ timeout: 15_000 });
 
     // Wait until >=2 streamed step events have rendered (proof of live streaming), then shoot.
     await page.waitForFunction(() => {
@@ -88,8 +90,8 @@ async function run() {
     const addressTier = await page.locator(".tier-address").count();
     assert(addressTier >= 1, "an ADDRESS-tiered element is present");
 
-    // The scan stays available, collapsed, after the dossier renders (§12).
-    const collapsed = page.getByText(/Scan log .* step/i).first();
+    // The scan stays available, collapsed AND inviting, after the dossier renders (§12).
+    const collapsed = page.getByText(/What Warden checked — \d+ step/i).first();
     assert(await collapsed.isVisible(), "collapsed scan log stays available after dossier renders");
 
     await page.screenshot({ path: `${SHOTS}/02_final_dossier.png`, fullPage: true });
