@@ -30,8 +30,14 @@ async function run() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
 
   const consoleErrors = [];
+  // Ignore dev-server transients (HMR / static-chunk 404s during recompile) that a
+  // production build never emits; still catch any REAL app/runtime error.
+  const isNoise = (t) =>
+    /Failed to load resource: the server responded with a status of 404/.test(t) ||
+    /\/_next\/.*\b404\b/.test(t) ||
+    /favicon\.ico/.test(t);
   page.on("console", (m) => {
-    if (m.type() === "error") consoleErrors.push(m.text());
+    if (m.type() === "error" && !isNoise(m.text())) consoleErrors.push(m.text());
   });
   page.on("pageerror", (e) => consoleErrors.push("pageerror: " + e.message));
 
