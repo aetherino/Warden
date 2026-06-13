@@ -2,8 +2,17 @@
 
 import { useState } from "react";
 import ShieldLoader from "@/components/ShieldLoader";
+import ScanLog from "@/components/ScanLog";
 import type { ShieldTier } from "@/components/InvisibleShield";
-import type { Dossier, Finding, Tier } from "@/lib/types";
+import type { Dossier, Finding, ScanEvent, Tier } from "@/lib/types";
+
+// Severity ordering — ACT loudest. Used to track the HIGHEST tier seen so far as
+// step events stream in, so the shield reacts live (rubric §12). Origin-blind.
+const TIER_ORDER: Record<Tier, number> = { ACT: 0, ADDRESS: 1, AWARE: 2, CONTEXT: 3 };
+function higherTier(a: Tier | null, b: Tier): Tier {
+  if (!a) return b;
+  return TIER_ORDER[b] < TIER_ORDER[a] ? b : a;
+}
 
 const DEMO_BASKET = [
   "Fisher-Price Rock 'n Play Sleeper",
@@ -124,45 +133,119 @@ function CountStat({ tier, n }: { tier: Tier; n: number }) {
   );
 }
 
+// Build context from intake. #036: send the user's AREA (ZIP + tap-water toggle) so
+// EPA ADDRESS findings surface in the UI. Schema is non-medical exposure proxies only.
+function buildContext(zip: string, tapWater: boolean): Record<string, unknown> {
+  const ctx: Record<string, unknown> = {};
+  const z = zip.replace(/\D/g, "").slice(0, 5);
+  if (z.length === 5) ctx.zip = z;
+  if (tapWater) ctx.water_source = "tap";
+  return ctx;
+}
+
+// A finding's shape must be valid before we render it — a malformed body can't crash.
+function isValidDossier(d: Partial<Dossier> | null): d is Dossier {
+  return !!d && !d.error && Array.isArray(d.findings) && !!d.counts;
+}
+
 export default function Home() {
   const [text, setText] = useState("");
+  const [zip, setZip] = useState("");
+  const [tapWater, setTapWater] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dossier, setDossier] = useState<Dossier | null>(null);
+  const [events, setEvents] = useState<ScanEvent[]>([]);
+  const [liveTier, setLiveTier] = useState<Tier | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const shieldTier: ShieldTier = loading
-    ? "IDLE"
-    : dossier && !dossier.error
-    ? (dossier.top_tier as ShieldTier)
-    : "IDLE";
+  // The shield reacts LIVE: during the scan it tracks the highest tier seen so far
+  // from the stream; once the dossier lands it locks to top_tier. Origin-blind, tier-only.
+  const shieldTier: ShieldTier =
+    dossier && !dossier.error
+      ? (dossier.top_tier as ShieldTier)
+      : loading
+      ? ((liveTier as ShieldTier) ?? "IDLE")
+      : "IDLE";
+
+  // Graceful fallback to the non-stream /api/dossier if the stream errors (§9 / §12).
+  async function auditFallback(items: string[], context: Record<string, unknown>) {
+    const r = await fetch("/api/dossier", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ items, context }),
+    });
+    const data = (await r.json().catch(() => null)) as Partial<Dossier> | null;
+    if (!r.ok || !isValidDossier(data)) {
+      setErr("unreachable");
+      setDossier(null);
+      return;
+    }
+    setDossier(data);
+  }
 
   async function audit(items: string[]) {
     setLoading(true);
     setErr(null);
     setDossier(null);
+    setEvents([]);
+    setLiveTier(null);
+    const context = buildContext(zip, tapWater);
+
     try {
-      const r = await fetch("/api/dossier", {
+      const r = await fetch("/api/dossier/stream", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ items, context: {} }),
+        body: JSON.stringify({ items, context }),
       });
-      // The proxy can return a non-dossier error body — gate on HTTP status first.
-      const data = (await r.json().catch(() => null)) as Partial<Dossier> | null;
-      if (!r.ok || !data || data.error) {
-        setErr("unreachable");
-        setDossier(null);
-        return;
+      // EventSource can't POST — consume the NDJSON stream via the response reader.
+      if (!r.ok || !r.body) throw new Error("stream_unavailable");
+
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let terminal: Dossier | null = null;
+
+      // Parse newline-delimited JSON as bytes arrive — render each step live.
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (value) buf += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          let obj: ScanEvent | (Dossier & { type?: string });
+          try {
+            obj = JSON.parse(line);
+          } catch {
+            continue; // partial/garbled line — skip, keep streaming
+          }
+          if ((obj as { type?: string }).type === "dossier") {
+            const d = obj as Dossier & { type?: string };
+            if (isValidDossier(d)) terminal = d;
+          } else {
+            const ev = obj as ScanEvent;
+            setEvents((prev) => [...prev, ev]);
+            if (ev.tier) setLiveTier((prev) => higherTier(prev, ev.tier as Tier));
+          }
+        }
+        if (done) break;
       }
-      // Only render when the shape is valid so a malformed body can't crash the page.
-      if (!Array.isArray(data.findings) || !data.counts) {
-        setErr("unreachable");
-        setDossier(null);
-        return;
+
+      if (terminal) {
+        setDossier(terminal);
+      } else {
+        // Stream ended without a usable terminal dossier — fall back to /api/dossier.
+        await auditFallback(items, context);
       }
-      setDossier(data as Dossier);
     } catch {
-      setErr("unreachable");
-      setDossier(null);
+      // Any stream failure (network, malformed) -> non-stream fallback, then error UI.
+      try {
+        await auditFallback(items, context);
+      } catch {
+        setErr("unreachable");
+        setDossier(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -242,6 +325,45 @@ export default function Home() {
             style={{ fontFamily: "var(--font-mono)" }}
           />
 
+          {/* AREA intake (#036) — optional. ZIP + unfiltered-tap toggle drive the EPA
+              water (SDWA-by-ZIP) ADDRESS path. Non-medical exposure proxies only;
+              never collects age/diagnoses/conditions (rubric §6 intake-schema rule). */}
+          <div className="mt-3 rounded-[3px] border bg-white/50 px-3.5 py-3 hairline-soft">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--ink-faint)]">
+              Your area — optional
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
+              <label className="flex items-center gap-2">
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                  ZIP
+                </span>
+                <input
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                  inputMode="numeric"
+                  maxLength={5}
+                  placeholder="48503"
+                  aria-label="ZIP code"
+                  className="w-[88px] rounded-[3px] border bg-white/80 px-2.5 py-1.5 font-mono text-[13px] tracking-[0.08em] text-[var(--ink)] placeholder:text-[var(--ink-faint)] hairline focus:border-[var(--ink-soft)] focus:outline-none"
+                />
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 select-none">
+                <input
+                  type="checkbox"
+                  checked={tapWater}
+                  onChange={(e) => setTapWater(e.target.checked)}
+                  className="h-[15px] w-[15px] accent-[var(--ink)]"
+                />
+                <span className="font-mono text-[11px] tracking-wide text-[var(--ink-soft)]">
+                  I drink unfiltered tap water
+                </span>
+              </label>
+            </div>
+            <p className="mt-2.5 font-mono text-[10px] leading-[1.5] text-[var(--ink-faint)]">
+              Used to check your water system&rsquo;s public EPA record — never health data.
+            </p>
+          </div>
+
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               onClick={submit}
@@ -251,7 +373,12 @@ export default function Home() {
               {loading ? "Auditing…" : "Run audit"}
             </button>
             <button
-              onClick={() => setText(DEMO_BASKET.join("\n"))}
+              onClick={() => {
+                // Demo path also pre-fills the AREA so the EPA ADDRESS row surfaces (#036).
+                setText(DEMO_BASKET.join("\n"));
+                setZip("48503");
+                setTapWater(true);
+              }}
               disabled={loading}
               className="font-mono text-[12px] uppercase tracking-[0.14em] text-[var(--ink-soft)] underline decoration-[var(--rule)] underline-offset-4 transition-colors hover:text-[var(--ink)] disabled:opacity-40"
             >
@@ -276,30 +403,16 @@ export default function Home() {
             </div>
           )}
 
+          {/* LIVE SCAN LOG (§12) — real step events stream here as the brain works.
+              Never a blank wait; the shield reacts to liveTier as findings land. */}
           {loading && (
-            <div className="reveal-fade pt-12">
-              <div className="flex items-center gap-3">
-                <span className="warden-pulse-dot" aria-hidden />
-                <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-[var(--ink-soft)]">
-                  Checking the public record
-                  <span className="warden-ellipsis" aria-hidden />
+            <div className="pt-12" data-testid="scan-log">
+              <ScanLog events={events} running />
+              {events.length === 0 && (
+                <p className="reveal-fade mt-4 font-mono text-[11px] tracking-wide text-[var(--ink-faint)]">
+                  Reaching the public record…
                 </p>
-              </div>
-              <div className="mt-5 max-w-md space-y-2.5" aria-hidden>
-                {["CPSC recalls", "CA Prop 65 notices", "EPA water violations"].map(
-                  (s, i) => (
-                    <div key={s} className="flex items-center gap-3">
-                      <span
-                        className="warden-scan-bar"
-                        style={{ animationDelay: `${i * 0.45}s` }}
-                      />
-                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink-faint)]">
-                        {s}
-                      </span>
-                    </div>
-                  )
-                )}
-              </div>
+              )}
             </div>
           )}
 
@@ -391,6 +504,11 @@ export default function Home() {
                     ))}
                   </div>
                 </details>
+              )}
+
+              {/* The live scan collapses but stays available (§12). */}
+              {events.length > 0 && (
+                <ScanLog events={events} running={false} collapsible />
               )}
 
               {dossier!.disclaimer && (

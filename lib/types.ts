@@ -33,6 +33,20 @@ export interface RecordStatement {
   suppressed_context: Finding[];
 }
 
+// Live agentic-scan step event (rubric §12 / Gate 13). The brain streams one per
+// real unit of work over POST /resolve/stream (NDJSON), then a terminal dossier.
+export type ScanStatus = "started" | "done" | "empty" | "error";
+
+export interface ScanEvent {
+  seq: number;
+  phase: string;
+  source: string;
+  item?: string;
+  status: ScanStatus;
+  detail: string;
+  tier?: Tier;
+}
+
 export interface Dossier {
   generated_at: string;
   items: string[];

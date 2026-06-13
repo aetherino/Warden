@@ -25,8 +25,35 @@ cd harness && ./.venv/bin/python -m warden.seed
 npm install      # first time only
 npm run dev
 ```
-Open http://localhost:3000 → enter items (or click **Use demo basket**) → **Audit**.
-The invisible shield reacts to the top tier (calm blue → amber ADDRESS → red ACT breach).
+Open http://localhost:3000 → enter items (or click **Use demo basket**) → optionally fill
+the **Your area** ZIP + "I drink unfiltered tap water" toggle (drives the EPA water/ADDRESS
+path, #036) → **Audit**. The audit streams a **live scan log** (rubric §12 / Gate 13): each
+real step (CPSC search → triage → per-finding, Prop 65, EPA-by-ZIP) appears as it lands, the
+invisible shield reacts to the highest tier seen so far (calm blue → amber ADDRESS → red ACT
+breach), then the ranked dossier replaces the log (which stays available, collapsed).
+
+### Live scan endpoints
+- `POST /resolve` — unchanged: returns the full dossier (the pytest suite + non-stream fallback).
+- `POST /resolve/stream` — NDJSON stream of typed step events `{seq, phase, source, item?,
+  status, detail, tier?}` then a terminal `{type:"dossier", ...}` (same object `/resolve`
+  returns). The UI proxies it via `app/api/dossier/stream/route.ts` and reads it with
+  `response.body.getReader()`; on any stream error it falls back to `/api/dossier`.
+
+Quick check:
+```bash
+curl -N -X POST http://127.0.0.1:8787/resolve/stream \
+  -H 'content-type: application/json' \
+  -d '{"items":["portable space heater"],"context":{"zip":"48503","water_source":"tap"}}'
+```
+
+### E2E (Playwright)
+With both servers up, run the §12 scan spec (self-driving, bare `playwright` package):
+```bash
+WARDEN_UI_URL=http://localhost:3000 node e2e/scan.spec.mjs
+```
+It enters a demo item + ZIP 48503, runs the audit, asserts the live scan log streams, the
+EPA ADDRESS finding surfaces (ZIP wired), the dossier renders, and 0 console errors.
+Screenshots land in `/tmp/warden_scan/`.
 
 ## What v1 does
 - Source: **CPSC product recalls** (keyless, live). EPA / Prop 65 / the §11 open-inference
