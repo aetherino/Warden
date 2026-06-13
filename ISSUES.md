@@ -2,10 +2,11 @@
 
 ## Status: v1 RUNNING + expanding. 4 parallel agents in flight: white particle-field reskin (worktree, runs frontend-design skill, + UX/error fixes), CA Prop 65 client (→CONTEXT), EPA water-by-ZIP client (→ADDRESS), triage hardening (compliance/§3/injection gates). Main-loop is orchestrating, not hand-coding.
 
-## In flight (parallel agents)
-- Reskin (worktree): white particle field — RUNNING (dark-blob fixed at iter3 → discrete particles; locking ACT state + polish). Merge when it reports.
-- prop65.py / epa_water.py / triage hardening (+compliance.py) / dossier integration — ALL DONE + verified end-to-end. Committed to master.
-- Backend now covers ACT (CPSC) + ADDRESS (EPA water, ZIP-driven) + CONTEXT (Prop 65) from real sources; compliance/§3/injection enforced mechanically (CPSC path).
+## In flight
+- Tester (main tree, new harness/tests/ + e2e/): building + running e2e suite (pytest API + Playwright UI) — RUNNING.
+- Reskin (worktree 61485df): white particle-field DONE — blob fixed (point-size attenuation was ~50× too big), archival type (Fraunces/Newsreader/IBM Plex Mono), tier-reactive field (calm slate→ACT red breach), mono receipt citations, error boundary, validated fetch; build/tsc/eslint clean. MERGE pending tester finish (merging now would HMR-reload :3000 mid-test).
+- Backend ACT+ADDRESS+CONTEXT from real sources + compliance/§3/injection gates — committed (e6d67bc).
+- QUEUED (gated on tester+merge): §12 live agentic scan — backend SSE step-stream + frontend live scan-log; + add the ZIP/water-source intake input (#036) so EPA findings surface from the UI.
 
 ## Big Picture
 Consumer hazard-audit agent. Lists what you own → grinds public regulatory/litigation/
@@ -46,6 +47,8 @@ Repo: github.com/aetherino/Warden (remote `origin`, branch `master`).
 - [ ] #025 — Wire EPA water (SDWA/UCMR) + CA Prop 65 sources into the runtime (v1 is CPSC-only) — Owner: TBD — P1
 - [ ] #026 — Build the §3 re-fetch verifier: v1 carries the CPSC-provided source.url but does not yet re-fetch + confirm hazard_type at the locator (drop-to-rejected) — Owner: TBD — P1
 - [ ] #027 — Deploy path: swap SQLite cache → Postgres (Supabase/Neon), expose the Python brain via `cloudflared`, set WARDEN_SERVICE_URL, deploy Next.js to Vercel — Owner: TBD — P2
+- [ ] #035 — §12 Live agentic scan (NEW rubric Gate 13): backend SSE/chunked endpoint streaming REAL per-source step events ({seq,phase,source,item?,status,detail,tier?} + terminal dossier) + frontend live scan-log (shield reacts as findings land; clean path streams too). No fabricated delays; within ≤8s budget; complements §10 stored record — Owner: TBD (queued behind tester + reskin merge) — P1
+- [ ] #036 — Reskinned UI has no ZIP/water-source intake input → EPA ADDRESS findings only surface via API, not the UI. Add an optional ZIP + water-source field to the intake, sent as context.{zip,water_source} — Owner: TBD — P1
 - [ ] #032 — Compliance whitelist for a CROSS-SOURCE scan: compliance.is_compliant runs only on the CPSC path today. A future global pass over EPA/Prop65 text must whitelist proper-noun "Safe Drinking Water Act" and negated "...not...unsafe" (else benign false positives) — Owner: TBD — P2
 - [ ] #028 — Visual direction gap: v1 shipped a DARK bg + iridescent SPHERE; user expected a PARTICLE SYSTEM on a WHITE/light background. Frontend judge agent evaluating + recommending the pivot. Constraint: clean/calm state must NOT imply "safe" (no green/all-clear) even on white — DECISION + likely reskin — Owner: user/main — P1
 - [ ] #029 — Chrome plugin MCP not connected in-session → UI audit running via headless Playwright as a stand-in. Connect the plugin for an in-browser manual audit — Owner: user — P2
@@ -78,6 +81,7 @@ Repo: github.com/aetherino/Warden (remote `origin`, branch `master`).
 - 2026-06-13 — §11 pathway-grounding allowlist EXTENDED to all regulators (added `*.cpsc.gov`/`saferproducts.gov`, `*.fda.gov`/openFDA, `fsis.usda.gov`, `oag.ca.gov`); the "established route" + linkage checks still apply, so a recall/notice page must attest the route, not just name a hazard.
 - 2026-06-13 — Git workflow CHANGED to direct-master commits (`Bash(git push:*)` permission in settings.local.json); PRs no longer required — checkpoint + push straight to master (the branch/PR flow caused diverging-tracker friction).
 - 2026-06-13 — Recon-informed: ZIP→PWSID via Census/HUD county crosswalk + UCMR5 direct map; per-violation findings need bulk-CSV ingestion (quarterly refresh job); confidence layer precomputed in the harness, never on the runtime hot path.
+- 2026-06-13 — Agentic-run view is now a rubric requirement (§12 + Gate 13): runtime STREAMS its real steps (per-source) to a live UI scan log — makes Autonomy/Orchestration visible, not just stored (§10). Honest (no fake delays), within ≤8s. To build (#035) after tester+reskin-merge.
 - 2026-06-13 — v1 store = LOCAL SQLITE (harness/warden.db) behind a thin store module; Postgres (Supabase or Vercel-Marketplace Neon) is a deploy-time swap. (Vercel has no first-party DB; offers Neon via Marketplace — answer to "can Vercel replace Supabase?")
 - 2026-06-13 — v1 backend = Python FastAPI "brain" (CPSC + Anthropic triage + cache) on :8787; Next.js UI proxies via /api/dossier. At deploy, cloudflared tunnels the brain to a Vercel-hosted UI (per user hint).
 - 2026-06-13 — Anthropic SDK LEARNING: default (600s timeout, 2 retries) turns transient stalls into multi-minute hangs. Fix: bounded 30s timeout, max_retries=0, STREAM the triage call (per-chunk timeout), cap recalls to ~6, retry triage on error-OR-empty ×3, graceful per-item degradation (§9). Model: claude-sonnet-4-6.
