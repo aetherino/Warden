@@ -33,12 +33,13 @@ A consumer hazard-audit agent. You list what you own (+ non-medical context); it
 - **Supabase** is the handoff seam between the two runtimes — and the seam where demos die, so it gets attention.
 - **Demo crawls live** (user's call) → the no-hang fallback (§A) and citation freshness are load-bearing; guardrails in §E (caching, seeded basket, T-30min smoke check).
 
-## 4. Tech stack (as scaffolded)
-- **Frontend:** Next.js 15.5.19 (App Router) · React 19 · TypeScript · Tailwind 4 (`@tailwindcss/postcss`).
-- **3D:** three.js 0.177.0 · @react-three/fiber 9.6.1 · @react-three/drei 10.7.7.
-- **Harness:** self-hosted Python + Anthropic Agent SDK (not yet scaffolded — schema + `SOURCES.md` now ready; blocked only on the Anthropic + Supabase keys).
-- **Data:** Supabase Postgres.
-- **Host:** Vercel (Fluid Compute; supports Python natively — relevant for the runtime agent). Remote: `github.com/aetherino/Warden`.
+## 4. Tech stack (v1 running)
+- **Frontend:** Next.js 15.5.19 (App Router) · React 19 · TypeScript · Tailwind 4. UI proxies to the brain via `app/api/dossier/route.ts`.
+- **3D:** three.js 0.177.0 · @react-three/fiber · @react-three/drei. Shield reacts to top tier (origin-blind).
+- **Brain (v1):** Python FastAPI service `harness/warden/` — CPSC live crawl + **Anthropic triage** (`anthropic` SDK, model `claude-sonnet-4-6`, streaming + structured tool output) + SQLite cache. Runs on :8787.
+- **Data (v1):** local **SQLite** (`harness/warden.db`) behind `store.py`; swap to Postgres (Supabase/Neon) at deploy.
+- **Host:** Vercel (UI) + cloudflared tunnel → local brain (deploy path). Remote: `github.com/aetherino/Warden`.
+- **Anthropic SDK gotcha (load-bearing):** default 600s timeout + 2 retries turns a transient stall into a multi-minute hang. Always: bounded timeout, `max_retries=0`, **stream** the call, cap inputs, and retry on error-OR-empty (the API intermittently returns an empty tool payload).
 
 ## 5. Repo layout
 ```
@@ -49,10 +50,19 @@ components/
 rubric.md                 the spec / gates ("done" definition)
 ISSUES.md                 tasks, state, decisions log
 brain.md                  this file
-SOURCES.md                verified data-source reference (endpoints, auth, ZIP→PWSID, citation strategy)
+  app/api/dossier/route.ts  proxy → Python brain (/resolve); WARDEN_SERVICE_URL
+lib/types.ts              dossier contract (mirrors harness/warden/dossier.py)
+harness/                  Python brain (FastAPI). venv at harness/.venv
+  warden/cpsc.py            CPSC client (keyword fan-out + relevance rank)
+  warden/triage.py          Anthropic triage (streaming, retry-on-empty, grounded citations)
+  warden/dossier.py         assemble + rank + suppress CONTEXT + record statements (parallel per item)
+  warden/store.py           SQLite cache (swap → Postgres at deploy)
+  warden/app.py             FastAPI /resolve + /health   ·  warden/seed.py  pre-warm demo basket
+  warden.db                 SQLite cache (gitignored)
+rubric.md / ISSUES.md / brain.md / SOURCES.md   spec / tasks / context / sources
+RUN.md                    how to run v1 (two processes)
 .claude/skills/           frontend-design skill (installed, for UI work)
 fixtures/                 (pending) example payload/dossier + golden_dev/golden_holdout
-harness/                  (pending) Python Agent SDK build-time crawler
 ```
 
 ## 6. Assumptions (revisit if any breaks)
@@ -81,3 +91,4 @@ harness/                  (pending) Python Agent SDK build-time crawler
 - **2026-06-13** — Foundation: rubric v2 (+§11 contextual discovery), Next.js+three.js shield scaffold, ISSUES.md tracker, memory seeded. Two workflows in flight: open-inference §11 design + source recon. brain.md created. Baseline committed.
 - **2026-06-13** — Open-inference §11 design (8-agent adversarial workflow) applied to rubric: schema `origin`+`discovery`, extended Gate 12, search-grounded default-reject judge (domain allowlist, string-linkage, anti-equivocation), `discovery_rejected.json`, surface cap, §10 pathway legibility, origin-blind shield. Source-recon workflow still running.
 - **2026-06-13** — Source recon (7-agent) → SOURCES.md; §11 allowlist extended to all regulators; PRs #1–#3 merged to master; direct-master commits enabled; frontend-design skill installed. Trackers flushed.
+- **2026-06-13** — **v1 built + verified end-to-end**: CPSC → Python FastAPI Anthropic triage → SQLite → Next.js dossier + tier-reactive shield. Peloton→ACT (cited), heater→6×ACT, empty→§9 record statement. Anthropic key provided (.env). Learned the SDK timeout/retry/streaming gotcha (see Tech stack). Open: triage flakiness (#024), wire EPA/Prop65 (#025), §3 re-fetch verifier (#026), deploy (#027).
