@@ -216,3 +216,22 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Next.js
+.next/
+out/
+
+# Vercel
+.vercel
+
+# Node
+node_modules/
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# Local env
+.env.local
+.env.*.local
+
