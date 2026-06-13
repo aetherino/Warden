@@ -33,7 +33,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Warden — Stand guard over your health",
+  title: "Warden — Guard your wellbeing",
   description:
     "Warden keeps watch over the recalls, water violations, and warnings on the things you own — ranked, cited, and exactly what to do. You stand guard; Warden does the watching.",
 };

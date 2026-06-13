@@ -383,7 +383,7 @@ export default function Home() {
             Warden
           </span>
           <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--ink-faint)]">
-            stand guard over your health
+            guard your wellbeing
           </span>
         </div>
         <div className="flex items-center gap-5">
@@ -409,8 +409,8 @@ export default function Home() {
               Start here
             </p>
             <h1 className="font-display mt-2 text-[30px] font-semibold leading-[1.06] tracking-tight text-[var(--ink)]">
-              Stand guard over{" "}
-              <span className="italic font-normal">your health.</span>
+              Guard your{" "}
+              <span className="italic font-normal">wellbeing.</span>
             </h1>
             <p className="mt-3 text-[14px] leading-[1.55] text-[var(--ink-soft)]">
               Warden tracks the recalls, water violations, and warnings on the things you
