@@ -151,14 +151,23 @@ function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const groupRef = useRef<THREE.Points>(null);
 
-  // device-aware count: ~7000 desktop, ~3000 mid, few hundred for static fallback.
+  // device-aware count (MOBILE_UX §2.2): ~7000 desktop, ~3000 mid phone, ~1500 for a
+  // genuinely weak phone, few hundred for static fallback. Lower tiers preserve density
+  // per square-inch because the dome is physically smaller on a phone screen. Never RAISE
+  // any tier (rubric §10) — and the point-size attenuation (4.6/-mv.z) stays untouched.
   const count = useMemo(() => {
     if (isStatic) return 600;
     if (typeof window === "undefined") return 3000;
     const w = window.innerWidth;
-    const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
-    if (w < 820 || mem <= 4) return 3000;
-    return 7000;
+    const nav = navigator as Navigator & {
+      deviceMemory?: number;
+      hardwareConcurrency?: number;
+    };
+    const mem = nav.deviceMemory ?? 8;
+    const cores = nav.hardwareConcurrency ?? 8;
+    if (w < 380 || mem <= 2 || cores <= 4) return 1500; // weak phone tier
+    if (w < 820 || mem <= 4) return 3000; // mid phone (unchanged)
+    return 7000; // desktop (unchanged)
   }, [isStatic]);
 
   // SPHERICAL SHELL distribution with radial jitter — a dome/volume of "coverage",
@@ -184,10 +193,13 @@ function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
     return { positions, seeds, radii };
   }, [count]);
 
+  // Harder DPR cap on the low tier (MOBILE_UX §2.2#4): a 3x-DPR budget phone need not
+  // shade the field at full retina. count===1500 is our "weak phone" marker.
   const pixelRatio = useMemo(() => {
     if (typeof window === "undefined") return 1;
-    return Math.min(window.devicePixelRatio, 2);
-  }, []);
+    const cap = count <= 1500 ? 1.5 : 2;
+    return Math.min(window.devicePixelRatio, cap);
+  }, [count]);
 
   // current (lerped) values for smooth tier transitions (ported pattern).
   const cur = useRef({
@@ -287,12 +299,34 @@ function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
   );
 }
 
-export default function InvisibleShield({ tier = "IDLE" }: { tier?: ShieldTier }) {
+// Tier color as a CSS hex — used to TINT the static fallback so reduced-motion /
+// no-WebGL users still get the sole severity signal (MOBILE_UX §2.5). A frozen
+// *colored* field is rubric-compliant; a frozen uncolored field loses the signal.
+function tierHex(tier: ShieldTier): string {
+  return `#${(TIER_CONFIG[tier] ?? TIER_CONFIG.IDLE).color.toString(16).padStart(6, "0")}`;
+}
+
+// phase drives the framerate budget (MOBILE_UX §2.2#2): full fps during the scan and
+// at a hot tier; throttle to demand when calm and off the critical path.
+export type ShieldPhase = "enroll" | "scanning" | "dossier";
+
+export default function InvisibleShield({
+  tier = "IDLE",
+  phase = "enroll",
+}: {
+  tier?: ShieldTier;
+  phase?: ShieldPhase;
+}) {
   const cfg = TIER_CONFIG[tier] ?? TIER_CONFIG.IDLE;
 
   // STATIC fallback on prefers-reduced-motion OR WebGL failure so the center is never blank.
   const [isStatic, setIsStatic] = useState(false);
   const [webglOk, setWebglOk] = useState(true);
+  // Visible = canvas is on-screen AND the tab is foregrounded. When false we pause the
+  // render loop entirely (MOBILE_UX §2.2#3) — the single biggest battery win on a long
+  // mobile scroll, real now that the dome is a contained band, not a full-bleed layer.
+  const [visible, setVisible] = useState(true);
+  const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -310,35 +344,64 @@ export default function InvisibleShield({ tier = "IDLE" }: { tier?: ShieldTier }
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
 
+  // Pause when off-screen / backgrounded.
+  useEffect(() => {
+    const el = hostRef.current;
+    const onVis = () => {
+      if (document.visibilityState === "hidden") setVisible(false);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    let io: IntersectionObserver | null = null;
+    if (el && "IntersectionObserver" in window) {
+      io = new IntersectionObserver(
+        ([entry]) => setVisible(entry.isIntersecting && document.visibilityState !== "hidden"),
+        { threshold: 0.01 }
+      );
+      io.observe(el);
+    }
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      io?.disconnect();
+    };
+  }, []);
+
   if (!webglOk) {
-    // No WebGL: a quiet CSS stipple so the center is never empty (no animation).
+    // No WebGL: a quiet CSS stipple, TINTED by the tier color so the severity signal
+    // survives (never empty, never a soothing-neutral wash at a hot tier).
+    const hex = tierHex(tier);
+    const alpha = tier === "ACT" ? 0.16 : tier === "ADDRESS" ? 0.13 : tier === "AWARE" ? 0.11 : 0.1;
     return (
       <div
+        ref={hostRef}
         className="w-full h-full"
         aria-hidden
         style={{
-          background:
-            "radial-gradient(circle at 50% 48%, rgba(110,118,128,0.10) 0%, transparent 62%)",
-          maskImage:
-            "radial-gradient(circle at 50% 48%, #000 0%, transparent 70%)",
+          background: `radial-gradient(circle at 50% 40%, color-mix(in srgb, ${hex} ${alpha * 100}%, transparent) 0%, transparent 62%)`,
+          maskImage: "radial-gradient(circle at 50% 40%, #000 0%, transparent 70%)",
+          WebkitMaskImage: "radial-gradient(circle at 50% 40%, #000 0%, transparent 70%)",
         }}
       />
     );
   }
 
+  // Full fps during the scan and at hot tiers; otherwise pause when calm/off-screen.
+  const hot = tier === "ADDRESS" || tier === "ACT";
+  const wantsAnimation = !isStatic && visible && (phase === "scanning" || hot || phase === "enroll");
+  const frameloop: "always" | "demand" = wantsAnimation ? "always" : "demand";
+
   return (
-    <div className="w-full h-full">
+    <div ref={hostRef} className="w-full h-full">
       <Canvas
         camera={{ position: [0, 0, 4.6], fov: 45 }}
         gl={{ alpha: true, antialias: false, powerPreference: "high-performance" }}
         dpr={[1, 2]}
-        frameloop={isStatic ? "demand" : "always"}
+        frameloop={frameloop}
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0);
         }}
         style={{ background: "transparent" }}
       >
-        <ParticleField cfg={cfg} isStatic={isStatic} />
+        <ParticleField cfg={cfg} isStatic={isStatic || !wantsAnimation} />
       </Canvas>
     </div>
   );

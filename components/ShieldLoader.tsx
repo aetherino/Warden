@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { ShieldTier } from "@/components/InvisibleShield";
+import type { ShieldTier, ShieldPhase } from "@/components/InvisibleShield";
 
 // Client component wrapper — ssr:false is only allowed inside client components in
 // the Next.js App Router. While the field loads we render a quiet neutral stipple so
@@ -20,6 +20,12 @@ const InvisibleShield = dynamic(() => import("@/components/InvisibleShield"), {
   ),
 });
 
-export default function ShieldLoader({ tier = "IDLE" }: { tier?: ShieldTier }) {
-  return <InvisibleShield tier={tier} />;
+export default function ShieldLoader({
+  tier = "IDLE",
+  phase = "enroll",
+}: {
+  tier?: ShieldTier;
+  phase?: ShieldPhase;
+}) {
+  return <InvisibleShield tier={tier} phase={phase} />;
 }
