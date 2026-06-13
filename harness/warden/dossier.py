@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime
 from concurrent.futures import ThreadPoolExecutor
 
-from . import cpsc, epa_water, prop65, store, triage
+from . import cpsc, discovery, epa_water, prop65, store, triage
 
 TIER_RANK = {"ACT": 0, "ADDRESS": 1, "AWARE": 2, "CONTEXT": 3}
 _SOURCES_CHECKED = [
@@ -109,6 +109,21 @@ def build_dossier(items: list[str], context: dict | None = None, *, use_cache: b
             print(f"[warden] resolve_water({zip_code!r}) failed: {type(e).__name__}: {e}",
                   file=sys.stderr)
 
+    # §11 contextual discovery (open inference). Runs ONLY when the context carries a ZIP
+    # or a proximity flag (so the plain item audit stays fast). ai_inferred / curated
+    # findings carry their OWN §3 source{} AND a `discovery` (pathway) receipt; they rank
+    # by tier like any finding. Grounded-but-empty pathways become coverage record
+    # statements; judge-rejected pathways go to `discovery_rejected` and NEVER surface.
+    # Degrades to empty on any error / timeout — never 500s or hangs the resolve (§9/§A).
+    discovery_rejected: list[dict] = []
+    if discovery._has_discovery_context(context):
+        disc = discovery.discover_bounded(context, items)
+        # Merge discovery findings, dropping any whose §3 source the direct path already
+        # surfaced (e.g. an AFFF→PFAS pathway resolving the same PWSID as the ZIP→SDWA path).
+        discovery.merge_discovery_findings(all_findings, disc.get("findings", []))
+        record_statements.extend(disc.get("record_statements", []))
+        discovery_rejected = disc.get("rejected", [])
+
     primary = [f for f in all_findings if f.get("tier") != "CONTEXT"]
     suppressed = [f for f in all_findings if f.get("tier") == "CONTEXT"]
     primary.sort(key=lambda f: (TIER_RANK.get(f.get("tier"), 9), f.get("item", "")))
@@ -131,6 +146,10 @@ def build_dossier(items: list[str], context: dict | None = None, *, use_cache: b
         # Candidates the model proposed but the deterministic gates DROPPED (judge-inspection
         # surface). Empty list is fine. Capped to keep the payload bounded.
         "rejected": rejected[:12],
+        # §11 pathway-layer reject sink (verifier/§10 only — NEVER rendered to the user):
+        # open-inference pathways the search-grounded default-reject judge set aside, with
+        # reject_reason + the skeptic search trace.
+        "discovery_rejected": discovery_rejected[:12],
         "checked_sources": _SOURCES_CHECKED,
         "disclaimer": (
             "Warden reports the state of the public record as of the date shown — "

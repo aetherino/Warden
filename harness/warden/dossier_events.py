@@ -28,7 +28,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Iterator
 
-from . import cpsc, epa_water, prop65, store, triage
+from . import cpsc, discovery, epa_water, prop65, store, triage
 from .dossier import TIER_RANK, _SOURCES_CHECKED, _today
 
 TIER_LABEL = {"ACT": "ACT", "ADDRESS": "ADDRESS", "AWARE": "AWARE", "CONTEXT": "CONTEXT"}
@@ -222,6 +222,29 @@ def build_dossier_events(items: list[str], context: dict | None = None,
                           f"{type(e).__name__}: {e}", file=sys.stderr)
                     emit("search", "EPA SDWA (ECHO)", "error",
                          f"EPA · ZIP {zip_code} → source error, skipped (degraded)")
+
+            # §11 contextual discovery (open inference) — runs only when the context
+            # carries a ZIP or a proximity flag. Emits its own infer→ground→kept/set-aside
+            # steps into the live log, then stashes its findings for the terminal dossier.
+            # Degrades to empty on any error / timeout (§9/§A) — never hangs the stream.
+            if discovery._has_discovery_context(context):
+                emit("discovery", "Contextual discovery (§11)", "started",
+                     "Reasoning from your context for exposure pathways the list never named…")
+                try:
+                    disc = discovery.discover_bounded(context, items)
+                except Exception as e:  # noqa: BLE001 — defensive; discover_bounded is non-raising
+                    print(f"[warden] discovery failed: {type(e).__name__}: {e}", file=sys.stderr)
+                    disc = {"findings": [], "rejected": [], "record_statements": [], "steps": []}
+                # Re-narrate discovery's own steps onto the shared sequenced stream (honest:
+                # these reflect the real infer/ground work discover() just did).
+                for s in disc.get("steps", []):
+                    emit("discovery", "Contextual discovery (§11)",
+                         s.get("status", "done"), s.get("detail", ""))
+                for f in disc.get("findings", []):
+                    emit("discovery", "Contextual discovery (§11)", "done",
+                         f"Checked because of your context → {f.get('tier')}: "
+                         f"{f.get('hazard_type', '')} [cited]", tier=f.get("tier"))
+                results["__discovery__"] = disc
         finally:
             q.put(None)  # sentinel: work done
 
@@ -258,6 +281,14 @@ def build_dossier_events(items: list[str], context: dict | None = None,
 
     all_findings.extend(results.get("__epa__", []))
 
+    # §11 discovery findings + coverage record statements + the pathway reject sink.
+    # Merge findings dropping any whose §3 source the direct path already surfaced (same
+    # PWSID via AFFF→PFAS vs the direct ZIP→SDWA path) — matches build_dossier.
+    disc = results.get("__discovery__", {}) or {}
+    discovery.merge_discovery_findings(all_findings, disc.get("findings", []))
+    record_statements.extend(disc.get("record_statements", []))
+    discovery_rejected: list[dict] = disc.get("rejected", [])
+
     rejected: list[dict] = []
     for it in items:
         rejected.extend(rejected_sinks.get(it, []))
@@ -289,6 +320,8 @@ def build_dossier_events(items: list[str], context: dict | None = None,
         "record_statements": record_statements,
         # Candidates the model proposed but the deterministic gates DROPPED (matches /resolve).
         "rejected": rejected[:12],
+        # §11 pathway-layer reject sink (verifier/§10 only — never rendered). Matches /resolve.
+        "discovery_rejected": discovery_rejected[:12],
         "checked_sources": _SOURCES_CHECKED,
         "disclaimer": (
             "Warden reports the state of the public record as of the date shown — "

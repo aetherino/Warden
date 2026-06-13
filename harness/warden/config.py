@@ -11,7 +11,12 @@ load_dotenv(_ROOT / ".env")
 load_dotenv(_HARNESS / ".env")
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+# §11 open-inference: Exa (search-grounded adjudicator) + OpenAlex (scholarly corroboration).
+EXA_API_KEY = os.environ.get("EXA_API_KEY")
+OPENALEX_API_KEY = os.environ.get("OPENALEX_API_KEY")
 TRIAGE_MODEL = os.environ.get("WARDEN_TRIAGE_MODEL", "claude-sonnet-4-6")
+# Discovery (§11) uses the same Sonnet by default; overridable for cost/latency tuning.
+DISCOVERY_MODEL = os.environ.get("WARDEN_DISCOVERY_MODEL", TRIAGE_MODEL)
 DB_PATH = os.environ.get("WARDEN_DB", str(_HARNESS / "warden.db"))
 HOST = os.environ.get("WARDEN_HOST", "127.0.0.1")
 PORT = int(os.environ.get("WARDEN_PORT", "8787"))
