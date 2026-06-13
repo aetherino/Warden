@@ -3,13 +3,20 @@
 import dynamic from "next/dynamic";
 import type { ShieldTier } from "@/components/InvisibleShield";
 
-// Client component wrapper — ssr:false is only allowed inside client components in Next.js 15 App Router
+// Client component wrapper — ssr:false is only allowed inside client components in
+// the Next.js App Router. While the field loads we render a quiet neutral stipple so
+// the center is never blank (coverage is present; the record is simply quiet).
 const InvisibleShield = dynamic(() => import("@/components/InvisibleShield"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center">
-      <div className="text-slate-600 text-sm tracking-widest uppercase">Initializing shield…</div>
-    </div>
+    <div
+      className="w-full h-full"
+      aria-hidden
+      style={{
+        background:
+          "radial-gradient(circle at 50% 48%, rgba(110,118,128,0.08) 0%, transparent 60%)",
+      }}
+    />
   ),
 });
 
