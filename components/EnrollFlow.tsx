@@ -497,7 +497,7 @@ export default function EnrollFlow({
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-faint)]">
                   Where
                 </span>
-                <button type="button" onClick={() => setStep(0)} className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)] underline decoration-[var(--rule)] underline-offset-2 hover:text-[var(--ink)]">
+                <button type="button" onClick={() => setStep(0)} className="-my-2 inline-flex min-h-[44px] items-center px-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)] underline decoration-[var(--rule)] underline-offset-2 hover:text-[var(--ink)]">
                   edit
                 </button>
               </div>
@@ -512,7 +512,7 @@ export default function EnrollFlow({
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-faint)]">
                   Nearby
                 </span>
-                <button type="button" onClick={() => setStep(1)} className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)] underline decoration-[var(--rule)] underline-offset-2 hover:text-[var(--ink)]">
+                <button type="button" onClick={() => setStep(1)} className="-my-2 inline-flex min-h-[44px] items-center px-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)] underline decoration-[var(--rule)] underline-offset-2 hover:text-[var(--ink)]">
                   edit
                 </button>
               </div>
@@ -526,7 +526,7 @@ export default function EnrollFlow({
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-faint)]">
                   What you own
                 </span>
-                <button type="button" onClick={() => setStep(2)} className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)] underline decoration-[var(--rule)] underline-offset-2 hover:text-[var(--ink)]">
+                <button type="button" onClick={() => setStep(2)} className="-my-2 inline-flex min-h-[44px] items-center px-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)] underline decoration-[var(--rule)] underline-offset-2 hover:text-[var(--ink)]">
                   edit
                 </button>
               </div>

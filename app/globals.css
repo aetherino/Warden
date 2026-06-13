@@ -389,12 +389,12 @@ details[open] > summary .disclosure-caret { transform: rotate(90deg); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-right: -0.35rem;
+  width: 30px;
+  height: 30px;
+  margin-right: -0.45rem;
   border-radius: 999px;
   color: var(--ink-faint);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
   transition: color 0.16s, background 0.16s;
 }
