@@ -47,6 +47,7 @@ const VERTEX = /* glsl */ `
   uniform float uDrift;
   uniform float uCluster;
   uniform float uBreach;
+  uniform float uScan;
   uniform float uPointScale;
   uniform float uPixelRatio;
   uniform float uStatic; // 1.0 = static fallback (freeze motion)
@@ -57,6 +58,7 @@ const VERTEX = /* glsl */ `
   varying float vSeed;
   varying float vBreach;   // brightness boost from a passing wavefront
   varying float vRadial;   // normalized radius for shading
+  varying float vFresnel;  // rim-vs-face term -> membrane shading
 
   // cheap hash-based 3d noise-ish displacement (no textures)
   vec3 hash3(float n) {
@@ -93,11 +95,21 @@ const VERTEX = /* glsl */ `
     float front = wave * 2.0;                       // expands to ~2.0 (past outer shell)
     float d = abs(radius - front);
     float pulse = smoothstep(0.16, 0.0, d) * uBreach;
-    vBreach = pulse;
-    // the wavefront also nudges points outward as it passes (displacement)
-    pos += dir * pulse * 0.10;
+    // SONAR ping — a faster outward ripple while the agent is scanning (telemetry, §12).
+    float sFront = fract(t * 0.5) * 2.3;
+    float sPing = smoothstep(0.13, 0.0, abs(radius - sFront)) * uScan;
+    vBreach = max(pulse, sPing * 0.85);
+    // wavefronts nudge points outward as they pass (displacement)
+    pos += dir * (pulse * 0.10 + sPing * 0.06);
 
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+
+    // FRESNEL membrane — points seen edge-on (the dome's rim) glow; face points stay
+    // faint, so the field reads as a translucent protective shell, not a solid ball.
+    vec3 nrm = normalize((modelViewMatrix * vec4(dir, 0.0)).xyz);
+    vec3 viewDir = normalize(-mv.xyz);
+    vFresnel = pow(1.0 - abs(dot(nrm, viewDir)), 2.2);
+
     gl_Position = projectionMatrix * mv;
 
     // perspective-correct point size — small + crisp so points stay DISCRETE
@@ -120,6 +132,7 @@ const FRAGMENT = /* glsl */ `
   varying float vSeed;
   varying float vBreach;
   varying float vRadial;
+  varying float vFresnel;
 
   void main() {
     // round, crisp-edged points (no texture) so the field reads as a granular
@@ -135,10 +148,13 @@ const FRAGMENT = /* glsl */ `
     vec3 col = mix(uColor, uHot, heat);
     // breach front flares bright.
     col += vBreach * 0.6;
+    // Fresnel rim: the shell's silhouette glows; faces stay faint -> reads as a membrane.
+    col += vFresnel * 0.30;
 
     // outer-shell points read a touch fainter -> sense of volume/depth.
     float depthFade = mix(0.72, 1.0, 1.0 - vRadial);
     float a = soft * uAlpha * depthFade + vBreach * 0.5;
+    a *= mix(0.80, 1.14, vFresnel);  // rim more present, face recessive -> dome read
     gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
   }
 `;
@@ -147,7 +163,7 @@ function lerp(a: number, b: number, k: number) {
   return a + (b - a) * k;
 }
 
-function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
+function ParticleField({ cfg, isStatic, scanning }: { cfg: TierCfg; isStatic: boolean; scanning: boolean }) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const groupRef = useRef<THREE.Points>(null);
 
@@ -211,6 +227,7 @@ function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
     breach: cfg.breach,
     pointScale: cfg.pointScale,
     alpha: cfg.alpha,
+    scan: 0,
   });
 
   const uniforms = useMemo(
@@ -222,6 +239,7 @@ function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
       uDrift: { value: cfg.drift },
       uCluster: { value: cfg.cluster },
       uBreach: { value: cfg.breach },
+      uScan: { value: 0 },
       uPointScale: { value: cfg.pointScale },
       uAlpha: { value: cfg.alpha },
       uPixelRatio: { value: pixelRatio },
@@ -249,6 +267,7 @@ function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
       u.uBreach.value = cfg.breach;
       u.uPointScale.value = cfg.pointScale;
       u.uAlpha.value = cfg.alpha;
+      u.uScan.value = 0;
       return;
     }
 
@@ -261,6 +280,7 @@ function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
     cur.current.breach = lerp(cur.current.breach, cfg.breach, k);
     cur.current.pointScale = lerp(cur.current.pointScale, cfg.pointScale, k);
     cur.current.alpha = lerp(cur.current.alpha, cfg.alpha, k);
+    cur.current.scan = lerp(cur.current.scan, scanning ? 1 : 0, k);
 
     u.uTime.value = clock.getElapsedTime();
     (u.uColor.value as THREE.Color).copy(cur.current.color);
@@ -271,6 +291,7 @@ function ParticleField({ cfg, isStatic }: { cfg: TierCfg; isStatic: boolean }) {
     u.uBreach.value = cur.current.breach;
     u.uPointScale.value = cur.current.pointScale;
     u.uAlpha.value = cur.current.alpha;
+    u.uScan.value = cur.current.scan;
 
     // a barely-there whole-field rotation gives parallax without per-frame JS attr writes.
     if (groupRef.current) {
@@ -401,7 +422,7 @@ export default function InvisibleShield({
         }}
         style={{ background: "transparent" }}
       >
-        <ParticleField cfg={cfg} isStatic={isStatic || !wantsAnimation} />
+        <ParticleField cfg={cfg} isStatic={isStatic || !wantsAnimation} scanning={phase === "scanning"} />
       </Canvas>
     </div>
   );
